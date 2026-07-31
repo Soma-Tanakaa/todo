@@ -1,0 +1,24 @@
+@import "tailwindcss";
+
+@theme {
+  --color-must: #ea580c;
+  --color-want: #0284c7;
+  --color-overdue: #dc2626;
+}
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", "Hiragino Kaku Gothic ProN",
+    "Hiragino Sans", "Yu Gothic UI", Meiryo, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+
+input,
+textarea,
+select,
+button {
+  font: inherit;
+}
