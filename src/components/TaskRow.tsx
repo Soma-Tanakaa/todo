@@ -33,6 +33,7 @@ export function TaskRow({
         </button>
         <Link
           href={`/task/${task.id}`}
+          prefetch={true}
           className="flex min-w-0 flex-1 flex-col justify-center py-2.5 active:bg-gray-50"
         >
           <span className="truncate text-[15px] leading-5">{task.title}</span>

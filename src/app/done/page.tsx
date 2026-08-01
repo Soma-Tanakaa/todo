@@ -62,6 +62,7 @@ export default function DonePage() {
                 />
                 <Link
                   href={`/task/${t.id}`}
+                  prefetch={true}
                   className="flex items-center justify-between gap-3 py-3 pr-4 pl-5 active:bg-gray-50"
                 >
                   <span className="min-w-0 truncate text-[15px] text-gray-600">

@@ -1,7 +1,6 @@
 import { createClient } from "@/lib/supabase/client";
 import { todayStr } from "./date";
 import type {
-  HomeTask,
   Repeat,
   Subtask,
   Task,
@@ -11,20 +10,20 @@ import type {
 
 // subtasks は tasks への FK を2本持つ（task_id / linked_task_id）ため、
 // 埋め込みには必ずカラム名ヒントを付ける
-const HOME_SELECT =
-  "*, subtasks!task_id(id,done,linked_task:tasks!linked_task_id(status))";
 const DETAIL_SELECT =
   "*, subtasks!task_id(*,linked_task:tasks!linked_task_id(id,status,title,completed_at)), origin:tasks!origin_task_id(id,title)";
 
-export async function fetchActiveTasks(): Promise<HomeTask[]> {
+// 一覧でも詳細と同じ形で取得する。ホーム表示に必要な範囲を超えるが、
+// タップ時に詳細画面を即表示できるよう、この結果で詳細キャッシュを温めるため
+export async function fetchActiveTasks(): Promise<TaskWithSubtasks[]> {
   const supabase = createClient();
   const { data, error } = await supabase
     .from("tasks")
-    .select(HOME_SELECT)
+    .select(DETAIL_SELECT)
     .eq("status", "active")
     .order("created_at", { ascending: true });
   if (error) throw error;
-  return data as unknown as HomeTask[];
+  return data as unknown as TaskWithSubtasks[];
 }
 
 export async function fetchDoneTasks(): Promise<Task[]> {

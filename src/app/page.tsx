@@ -13,7 +13,7 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { IconPlus } from "@/components/icons";
 import { TaskRow } from "@/components/TaskRow";
 import { TypeSegment } from "@/components/TypeSegment";
-import { cacheGet, cacheSet, HOME_CACHE_KEY } from "@/lib/cache";
+import { cacheGet, cacheSet, HOME_CACHE_KEY, taskCacheKey } from "@/lib/cache";
 import { completeTask, createTask, fetchActiveTasks } from "@/lib/data";
 import { todayStr } from "@/lib/date";
 import { splitSections } from "@/lib/sections";
@@ -28,7 +28,10 @@ export default function HomePage() {
 
   const load = useCallback(async () => {
     try {
-      setTasks(await fetchActiveTasks());
+      const data = await fetchActiveTasks();
+      setTasks(data);
+      // タップした瞬間に詳細画面を出せるよう、各タスクの詳細キャッシュを温める
+      for (const t of data) cacheSet(taskCacheKey(t.id), t);
     } catch {
       toast("読み込みに失敗しました");
     }
