@@ -9,6 +9,13 @@ import { IconCornerUpLeft, IconTrash } from "@/components/icons";
 import { SubtaskList } from "@/components/SubtaskList";
 import { TypeSegment } from "@/components/TypeSegment";
 import {
+  cacheDelete,
+  cacheGet,
+  cacheSet,
+  HOME_CACHE_KEY,
+  taskCacheKey,
+} from "@/lib/cache";
+import {
   addSubtask,
   completeTask,
   deleteSubtask,
@@ -25,6 +32,7 @@ import { toast } from "@/lib/toast";
 import {
   isSubDone,
   progressOf,
+  type HomeTask,
   type Repeat,
   type SubtaskWithLink,
   type TaskWithSubtasks,
@@ -39,17 +47,20 @@ export default function TaskDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
 
-  const [task, setTask] = useState<TaskWithSubtasks | null>(null);
-  const [loaded, setLoaded] = useState(false);
+  const [task, setTask] = useState<TaskWithSubtasks | null>(() =>
+    cacheGet<TaskWithSubtasks>(taskCacheKey(id))
+  );
+  const [loaded, setLoaded] = useState(task !== null);
   const [showDoneSubs, setShowDoneSubs] = useState(true);
   const [confirm, setConfirm] = useState<Confirm | null>(null);
-  const [titleDraft, setTitleDraft] = useState("");
-  const [noteDraft, setNoteDraft] = useState("");
-  const draftsInitRef = useRef(false);
+  const [titleDraft, setTitleDraft] = useState(task?.title ?? "");
+  const [noteDraft, setNoteDraft] = useState(task?.note ?? "");
+  const draftsInitRef = useRef(task !== null);
 
   const load = useCallback(async () => {
     try {
       const t = await fetchTask(id);
+      if (!t) cacheDelete(taskCacheKey(id));
       setTask(t);
       if (t && !draftsInitRef.current) {
         setTitleDraft(t.title);
@@ -66,6 +77,10 @@ export default function TaskDetailPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    if (task) cacheSet(taskCacheKey(id), task);
+  }, [id, task]);
 
   const activeSubs = useMemo(
     () =>
@@ -200,6 +215,13 @@ export default function TaskDetailPage() {
     setConfirm(null);
     try {
       await completeTask(task.id);
+      const home = cacheGet<HomeTask[]>(HOME_CACHE_KEY);
+      if (home) {
+        cacheSet(
+          HOME_CACHE_KEY,
+          home.filter((x) => x.id !== task.id)
+        );
+      }
       router.push("/");
     } catch {
       toast("完了にできませんでした");
@@ -221,6 +243,14 @@ export default function TaskDetailPage() {
     setConfirm(null);
     try {
       await deleteTask(task.id);
+      cacheDelete(taskCacheKey(task.id));
+      const home = cacheGet<HomeTask[]>(HOME_CACHE_KEY);
+      if (home) {
+        cacheSet(
+          HOME_CACHE_KEY,
+          home.filter((x) => x.id !== task.id)
+        );
+      }
       router.push("/");
     } catch {
       toast("削除できませんでした");

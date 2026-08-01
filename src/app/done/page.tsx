@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { AppHeader } from "@/components/AppHeader";
+import { cacheClear, cacheGet, cacheSet, DONE_CACHE_KEY } from "@/lib/cache";
 import { fetchDoneTasks } from "@/lib/data";
 import { formatTs } from "@/lib/date";
 import { createClient } from "@/lib/supabase/client";
@@ -12,7 +13,9 @@ import type { Task } from "@/lib/types";
 
 export default function DonePage() {
   const router = useRouter();
-  const [tasks, setTasks] = useState<Task[] | null>(null);
+  const [tasks, setTasks] = useState<Task[] | null>(() =>
+    cacheGet<Task[]>(DONE_CACHE_KEY)
+  );
 
   const load = useCallback(async () => {
     try {
@@ -26,7 +29,12 @@ export default function DonePage() {
     load();
   }, [load]);
 
+  useEffect(() => {
+    if (tasks) cacheSet(DONE_CACHE_KEY, tasks);
+  }, [tasks]);
+
   const logout = async () => {
+    cacheClear();
     const supabase = createClient();
     await supabase.auth.signOut();
     router.push("/login");

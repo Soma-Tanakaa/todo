@@ -13,6 +13,7 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { IconPlus } from "@/components/icons";
 import { TaskRow } from "@/components/TaskRow";
 import { TypeSegment } from "@/components/TypeSegment";
+import { cacheGet, cacheSet, HOME_CACHE_KEY } from "@/lib/cache";
 import { completeTask, createTask, fetchActiveTasks } from "@/lib/data";
 import { todayStr } from "@/lib/date";
 import { splitSections } from "@/lib/sections";
@@ -20,7 +21,9 @@ import { toast } from "@/lib/toast";
 import { isSubDone, type HomeTask, type TaskType } from "@/lib/types";
 
 export default function HomePage() {
-  const [tasks, setTasks] = useState<HomeTask[] | null>(null);
+  const [tasks, setTasks] = useState<HomeTask[] | null>(() =>
+    cacheGet<HomeTask[]>(HOME_CACHE_KEY)
+  );
   const [confirming, setConfirming] = useState<HomeTask | null>(null);
 
   const load = useCallback(async () => {
@@ -34,6 +37,10 @@ export default function HomePage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    if (tasks) cacheSet(HOME_CACHE_KEY, tasks);
+  }, [tasks]);
 
   const sections = useMemo(
     () => (tasks ? splitSections(tasks, todayStr()) : null),

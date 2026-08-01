@@ -24,9 +24,10 @@ export async function updateSession(request: NextRequest) {
     },
   });
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // getUser() は毎リクエストAuthサーバーへ往復するため使わない。
+  // このプロジェクトはES256署名鍵なので getClaims() はJWKS（キャッシュ済み）でローカル検証できる
+  const { data } = await supabase.auth.getClaims();
+  const user = data?.claims ?? null;
 
   const { pathname } = request.nextUrl;
 
