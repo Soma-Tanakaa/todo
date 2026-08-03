@@ -537,6 +537,9 @@ export function TaskFlowyApp({ db }: { db: DataSource }) {
               ))
             )}
           </div>
+          {/* 下部の余白: 最下部のタスクを画面中央あたりまでスクロールできるようにする。
+              ズームの影響を受けないようzoomラッパーの外に置く */}
+          {forest.length > 0 && <div aria-hidden className="h-[45vh]" />}
         </div>
 
         <DoLists
