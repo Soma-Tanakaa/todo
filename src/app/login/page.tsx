@@ -32,39 +32,41 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="flex min-h-dvh flex-col justify-center px-6 pb-24">
-      <h1 className="text-center text-2xl font-bold">進捗帖</h1>
-      <p className="mt-1 text-center text-xs text-gray-400">
-        毎朝開いて、今日やるべきことが一目でわかる
-      </p>
-      <form onSubmit={submit} className="mt-8 flex flex-col gap-3">
-        <input
-          type="email"
-          required
-          autoComplete="email"
-          placeholder="メールアドレス"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-base outline-none focus:border-gray-400"
-        />
-        <input
-          type="password"
-          required
-          autoComplete="current-password"
-          placeholder="パスワード"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-base outline-none focus:border-gray-400"
-        />
-        {error && <p className="text-overdue text-sm">{error}</p>}
-        <button
-          type="submit"
-          disabled={loading}
-          className="mt-2 rounded-xl bg-gray-900 py-3 text-[15px] font-semibold text-white active:opacity-80 disabled:opacity-50"
-        >
-          {loading ? "サインイン中..." : "サインイン"}
-        </button>
-      </form>
+    <main className="flex min-h-dvh flex-col justify-center bg-n100 px-6">
+      <div className="mx-auto w-full max-w-[380px] rounded-2xl border border-n400 bg-white p-8 shadow-card">
+        <h1 className="text-center text-[26px] font-bold">TaskFlowy</h1>
+        <p className="mt-1 text-center text-xs text-n600">
+          ツリーで進捗がひと目でわかるTODO
+        </p>
+        <form onSubmit={submit} className="mt-7 flex flex-col gap-3">
+          <input
+            className="input"
+            type="email"
+            required
+            autoComplete="email"
+            placeholder="メールアドレス"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+          <input
+            className="input"
+            type="password"
+            required
+            autoComplete="current-password"
+            placeholder="パスワード"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+          {error && <p className="text-[13px] text-soon">{error}</p>}
+          <button
+            type="submit"
+            disabled={loading}
+            className="btn btn-primary mt-2 disabled:opacity-50"
+          >
+            {loading ? "サインイン中..." : "サインイン"}
+          </button>
+        </form>
+      </div>
     </main>
   );
 }

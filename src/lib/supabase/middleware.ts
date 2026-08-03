@@ -31,6 +31,11 @@ export async function updateSession(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
+  // UIプレビュー(サンプルデータ・DB非接続)は開発環境のみ認証なしで開ける
+  if (process.env.NODE_ENV === "development" && pathname.startsWith("/preview")) {
+    return supabaseResponse;
+  }
+
   if (!user && !pathname.startsWith("/login")) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/login";

@@ -2,9 +2,9 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "進捗帖",
-    short_name: "進捗帖",
-    description: "毎朝開いて、今日やるべきことが一目でわかるタスク管理",
+    name: "TaskFlowy",
+    short_name: "TaskFlowy",
+    description: "タスクをマインドマップで管理するツリー型TODOアプリ",
     start_url: "/",
     display: "standalone",
     background_color: "#ffffff",

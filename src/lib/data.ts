@@ -1,156 +1,136 @@
 import { createClient } from "@/lib/supabase/client";
-import { todayStr } from "./date";
-import type {
-  Repeat,
-  Subtask,
-  Task,
-  TaskType,
-  TaskWithSubtasks,
-} from "./types";
+import type { ListItem, ListName, NodeRow, NodeStatus } from "./types";
 
-// subtasks は tasks への FK を2本持つ（task_id / linked_task_id）ため、
-// 埋め込みには必ずカラム名ヒントを付ける
-const DETAIL_SELECT =
-  "*, subtasks!task_id(*,linked_task:tasks!linked_task_id(id,status,title,completed_at)), origin:tasks!origin_task_id(id,title)";
+/** アプリが必要とするデータ操作一式。本番はSupabase、/previewはメモリ実装 */
+export interface DataSource {
+  fetchNodes(): Promise<NodeRow[]>;
+  createNode(input: {
+    parent_id: string | null;
+    title: string;
+    due_date: string | null;
+    sort_order: number;
+  }): Promise<NodeRow>;
+  updateNode(
+    id: string,
+    patch: Partial<
+      Pick<
+        NodeRow,
+        "title" | "due_date" | "status" | "next_flag" | "done_date" | "sort_order"
+      >
+    >
+  ): Promise<void>;
+  deleteNode(id: string): Promise<void>;
+  fetchListItems(): Promise<ListItem[]>;
+  createListItem(input: {
+    list: ListName;
+    title: string;
+    path: string;
+    due_date: string | null;
+    node_id: string | null;
+  }): Promise<ListItem>;
+  updateListItem(id: string, patch: Partial<Pick<ListItem, "checked">>): Promise<void>;
+  deleteListItem(id: string): Promise<void>;
+}
 
-// 一覧でも詳細と同じ形で取得する。ホーム表示に必要な範囲を超えるが、
-// タップ時に詳細画面を即表示できるよう、この結果で詳細キャッシュを温めるため
-export async function fetchActiveTasks(): Promise<TaskWithSubtasks[]> {
+export async function fetchNodes(): Promise<NodeRow[]> {
   const supabase = createClient();
   const { data, error } = await supabase
-    .from("tasks")
-    .select(DETAIL_SELECT)
-    .eq("status", "active")
+    .from("nodes")
+    .select("*")
+    .order("sort_order", { ascending: true })
     .order("created_at", { ascending: true });
   if (error) throw error;
-  return data as unknown as TaskWithSubtasks[];
+  return data as NodeRow[];
 }
 
-export async function fetchDoneTasks(): Promise<Task[]> {
-  const supabase = createClient();
-  const { data, error } = await supabase
-    .from("tasks")
-    .select("*")
-    .eq("status", "done")
-    .order("completed_at", { ascending: false })
-    .limit(300);
-  if (error) throw error;
-  return data as Task[];
-}
-
-export async function fetchTask(id: string): Promise<TaskWithSubtasks | null> {
-  const supabase = createClient();
-  const { data, error } = await supabase
-    .from("tasks")
-    .select(DETAIL_SELECT)
-    .eq("id", id)
-    .maybeSingle();
-  if (error) throw error;
-  return data as unknown as TaskWithSubtasks | null;
-}
-
-export async function createTask(input: {
+export async function createNode(input: {
+  parent_id: string | null;
   title: string;
-  type: TaskType;
-  due_date?: string | null;
-}): Promise<Task> {
+  due_date: string | null;
+  sort_order: number;
+}): Promise<NodeRow> {
   const supabase = createClient();
   const { data, error } = await supabase
-    .from("tasks")
+    .from("nodes")
     .insert(input)
     .select()
     .single();
   if (error) throw error;
-  return data as Task;
+  return data as NodeRow;
 }
 
-export async function updateTask(
+export async function updateNode(
   id: string,
   patch: Partial<{
     title: string;
-    type: TaskType;
     due_date: string | null;
-    flagged: boolean;
-    note: string;
-    status: "active" | "done";
-    repeat: Repeat | null;
-    completed_at: string | null;
+    status: NodeStatus;
+    next_flag: boolean;
+    done_date: string | null;
+    sort_order: number;
   }>
 ): Promise<void> {
   const supabase = createClient();
-  const { error } = await supabase.from("tasks").update(patch).eq("id", id);
+  const { error } = await supabase.from("nodes").update(patch).eq("id", id);
   if (error) throw error;
 }
 
-/** 完了処理。repeat 付きなら次回分の生成までDB関数内で1トランザクションで行う */
-export async function completeTask(id: string): Promise<void> {
+/** 子孫はDBのON DELETE CASCADEで一緒に消える */
+export async function deleteNode(id: string): Promise<void> {
   const supabase = createClient();
-  const { error } = await supabase.rpc("complete_task", {
-    p_task_id: id,
-    p_today: todayStr(),
-  });
+  const { error } = await supabase.from("nodes").delete().eq("id", id);
   if (error) throw error;
 }
 
-export async function reopenTask(id: string): Promise<void> {
-  await updateTask(id, { status: "active", completed_at: null });
-}
-
-export async function deleteTask(id: string): Promise<void> {
-  const supabase = createClient();
-  const { error } = await supabase.from("tasks").delete().eq("id", id);
-  if (error) throw error;
-}
-
-export async function addSubtask(
-  taskId: string,
-  title: string,
-  sortOrder: number
-): Promise<Subtask> {
+export async function fetchListItems(): Promise<ListItem[]> {
   const supabase = createClient();
   const { data, error } = await supabase
-    .from("subtasks")
-    .insert({ task_id: taskId, title, sort_order: sortOrder })
+    .from("list_items")
+    .select("*")
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return data as ListItem[];
+}
+
+export async function createListItem(input: {
+  list: ListName;
+  title: string;
+  path: string;
+  due_date: string | null;
+  node_id: string | null;
+}): Promise<ListItem> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("list_items")
+    .insert(input)
     .select()
     .single();
   if (error) throw error;
-  return data as Subtask;
+  return data as ListItem;
 }
 
-export async function updateSubtask(
+export async function updateListItem(
   id: string,
-  patch: Partial<Pick<Subtask, "title" | "done" | "completed_at" | "sort_order">>
+  patch: Partial<Pick<ListItem, "checked">>
 ): Promise<void> {
   const supabase = createClient();
-  const { error } = await supabase.from("subtasks").update(patch).eq("id", id);
+  const { error } = await supabase.from("list_items").update(patch).eq("id", id);
   if (error) throw error;
 }
 
-export async function deleteSubtask(id: string): Promise<void> {
+export async function deleteListItem(id: string): Promise<void> {
   const supabase = createClient();
-  const { error } = await supabase.from("subtasks").delete().eq("id", id);
+  const { error } = await supabase.from("list_items").delete().eq("id", id);
   if (error) throw error;
 }
 
-export async function reorderSubtasks(
-  items: { id: string; sort_order: number }[]
-): Promise<void> {
-  const supabase = createClient();
-  const results = await Promise.all(
-    items.map((i) =>
-      supabase.from("subtasks").update({ sort_order: i.sort_order }).eq("id", i.id)
-    )
-  );
-  const failed = results.find((r) => r.error);
-  if (failed?.error) throw failed.error;
-}
-
-/** サブタスクの昇格。新タスク作成とリンク設定をDB関数内で1トランザクションで行う */
-export async function promoteSubtask(id: string): Promise<string> {
-  const supabase = createClient();
-  const { data, error } = await supabase.rpc("promote_subtask", {
-    p_subtask_id: id,
-  });
-  if (error) throw error;
-  return data as string;
-}
+export const supabaseDb: DataSource = {
+  fetchNodes,
+  createNode,
+  updateNode,
+  deleteNode,
+  fetchListItems,
+  createListItem,
+  updateListItem,
+  deleteListItem,
+};

@@ -1,14 +1,21 @@
 import type { Metadata, Viewport } from "next";
+import { M_PLUS_Rounded_1c } from "next/font/google";
 import { SWRegister } from "@/components/SWRegister";
 import { Toaster } from "@/components/Toaster";
 import "./globals.css";
 
+const rounded = M_PLUS_Rounded_1c({
+  weight: ["400", "500", "700"],
+  subsets: ["latin"],
+  display: "swap",
+});
+
 export const metadata: Metadata = {
-  title: "進捗帖",
-  description: "毎朝開いて、今日やるべきことが一目でわかるタスク管理",
+  title: "TaskFlowy",
+  description: "タスクをマインドマップで管理するツリー型TODOアプリ",
   appleWebApp: {
     capable: true,
-    title: "進捗帖",
+    title: "TaskFlowy",
     statusBarStyle: "default",
   },
   icons: {
@@ -19,7 +26,6 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
   viewportFit: "cover",
   themeColor: "#ffffff",
 };
@@ -31,10 +37,8 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ja">
-      <body className="bg-gray-50 text-gray-900 antialiased">
-        <div className="mx-auto min-h-dvh max-w-lg bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.05)]">
-          {children}
-        </div>
+      <body className={`${rounded.className} bg-white text-n900 antialiased`}>
+        {children}
         <Toaster />
         <SWRegister />
       </body>

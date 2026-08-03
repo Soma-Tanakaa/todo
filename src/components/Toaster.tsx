@@ -21,7 +21,7 @@ export function Toaster() {
 
   if (!msg) return null;
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-24 z-50 flex justify-center px-4">
+    <div className="pointer-events-none fixed inset-x-0 bottom-8 z-[200] flex justify-center px-4">
       <div className="rounded-full bg-gray-900/90 px-4 py-2 text-sm text-white shadow-lg">
         {msg}
       </div>

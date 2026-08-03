@@ -1,64 +1,42 @@
-export type TaskType = "must" | "want";
-export type TaskStatus = "active" | "done";
-export type Repeat = "daily" | "weekly" | "monthly";
+export type NodeStatus = "todo" | "active" | "done";
+export type ListName = "today" | "later";
 
-export interface Task {
+/** nodes テーブルの1行(ツリーのノード) */
+export interface NodeRow {
   id: string;
   user_id: string;
+  parent_id: string | null;
   title: string;
-  type: TaskType;
-  due_date: string | null;
-  flagged: boolean;
-  note: string;
-  status: TaskStatus;
-  repeat: Repeat | null;
-  origin_task_id: string | null;
-  created_at: string;
-  completed_at: string | null;
-}
-
-export interface Subtask {
-  id: string;
-  task_id: string;
-  title: string;
-  done: boolean;
-  completed_at: string | null;
+  due_date: string | null; // YYYY-MM-DD
+  status: NodeStatus;
+  next_flag: boolean;
+  done_date: string | null; // YYYY-MM-DD
   sort_order: number;
-  linked_task_id: string | null;
+  created_at: string;
 }
 
-export type LinkedTaskRef = Pick<Task, "id" | "status" | "title" | "completed_at">;
-
-export interface SubtaskWithLink extends Subtask {
-  linked_task: LinkedTaskRef | null;
-}
-
-export interface TaskWithSubtasks extends Task {
-  subtasks: SubtaskWithLink[];
-  origin: Pick<Task, "id" | "title"> | null;
-}
-
-export interface HomeSubtask {
+/** list_items テーブルの1行(今日やる/明日以降やる のコピー) */
+export interface ListItem {
   id: string;
-  done: boolean;
-  linked_task: { status: TaskStatus } | null;
+  user_id: string;
+  list: ListName;
+  title: string;
+  path: string;
+  due_date: string | null;
+  node_id: string | null;
+  checked: boolean;
+  created_at: string;
 }
 
-export interface HomeTask extends Task {
-  subtasks: HomeSubtask[];
+/** 子を展開済みのツリーノード */
+export interface TreeNode extends NodeRow {
+  children: TreeNode[];
 }
 
-/** 参照サブタスクは自分の done を持たず、リンク先タスクの status から導出する */
-export function isSubDone(s: {
-  done: boolean;
-  linked_task?: { status: TaskStatus } | null;
-}): boolean {
-  return s.linked_task ? s.linked_task.status === "done" : s.done;
-}
-
-export function progressOf(
-  subs: { done: boolean; linked_task?: { status: TaskStatus } | null }[]
-): { done: number; total: number } | null {
-  if (subs.length === 0) return null;
-  return { done: subs.filter(isSubDone).length, total: subs.length };
+/** ツリー→リストへのD&Dで運ぶデータ */
+export interface DragPayload {
+  title: string;
+  path: string;
+  due_date: string | null;
+  node_id: string;
 }
