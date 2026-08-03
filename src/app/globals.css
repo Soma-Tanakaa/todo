@@ -43,6 +43,13 @@ button {
   font: inherit;
 }
 
+/* キャンバスをドラッグでパンしている間はどこでも「掴んでいる」カーソルにする */
+.tf-panning,
+.tf-panning * {
+  cursor: grabbing !important;
+  user-select: none !important;
+}
+
 /* ダイアログのフォーム部品 */
 .input {
   width: 100%;

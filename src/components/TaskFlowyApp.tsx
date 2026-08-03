@@ -3,10 +3,12 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
   type DragEvent,
+  type PointerEvent as ReactPointerEvent,
 } from "react";
 import { DoLists } from "@/components/DoLists";
 import { Header } from "@/components/Header";
@@ -47,6 +49,20 @@ export function TaskFlowyApp({ db }: { db: DataSource }) {
   dialogRef.current = dialog;
   const dragRef = useRef<DragPayload | null>(null);
   const canvasRef = useRef<HTMLDivElement | null>(null);
+  const zoomWrapRef = useRef<HTMLDivElement | null>(null);
+  const zoomRef = useRef(zoom);
+  zoomRef.current = zoom;
+  // ズーム適用後にアンカー点(カーソル/中心)が同じ画面位置に来るようスクロールを補正する
+  const zoomAnchorRef = useRef<{ x: number; y: number; prevZoom: number } | null>(
+    null
+  );
+  const panRef = useRef<{
+    id: number;
+    sx: number;
+    sy: number;
+    sl: number;
+    st: number;
+  } | null>(null);
 
   // 初期ロード(データ + 端末ローカルのUI状態)
   useEffect(() => {
@@ -100,23 +116,104 @@ export function TaskFlowyApp({ db }: { db: DataSource }) {
     return () => window.removeEventListener("keydown", h);
   }, []);
 
+  /** ズーム変更。anchor(キャンバス左上基準の画面座標)の下のコンテンツが動かないよう補正付き */
+  const applyZoom = useCallback(
+    (compute: (z: number) => number, anchor?: { x: number; y: number }) => {
+      const prev = zoomRef.current;
+      const nz = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, compute(prev)));
+      if (nz === prev) return;
+      if (anchor && canvasRef.current) {
+        zoomAnchorRef.current = { ...anchor, prevZoom: prev };
+      }
+      setZoom(nz);
+    },
+    []
+  );
+
+  // 新しいzoomがDOMに反映された直後(描画前)にスクロール位置を補正する
+  useLayoutEffect(() => {
+    const a = zoomAnchorRef.current;
+    const c = canvasRef.current;
+    if (!a || !c) return;
+    zoomAnchorRef.current = null;
+    const k = zoom / a.prevZoom;
+    const w = zoomWrapRef.current;
+    const offX = w ? w.offsetLeft : 0;
+    const offY = w ? w.offsetTop : 0;
+    c.scrollLeft = (c.scrollLeft + a.x - offX) * k + offX - a.x;
+    c.scrollTop = (c.scrollTop + a.y - offY) * k + offY - a.y;
+  }, [zoom]);
+
   // トラックパッドのピンチはctrl+wheelで届く。preventDefaultするためpassive:false必須
-  const attachCanvas = useCallback((el: HTMLDivElement | null) => {
-    canvasRef.current = el;
-    if (!el) return;
-    const onWheel = (e: WheelEvent) => {
-      if (!e.ctrlKey) return;
-      e.preventDefault();
-      setZoom((z) =>
-        Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z * Math.exp(-e.deltaY * 0.012)))
-      );
+  const attachCanvas = useCallback(
+    (el: HTMLDivElement | null) => {
+      canvasRef.current = el;
+      if (!el) return;
+      const onWheel = (e: WheelEvent) => {
+        if (!e.ctrlKey) return;
+        e.preventDefault();
+        const rect = el.getBoundingClientRect();
+        applyZoom((z) => z * Math.exp(-e.deltaY * 0.012), {
+          x: e.clientX - rect.left,
+          y: e.clientY - rect.top,
+        });
+      };
+      el.addEventListener("wheel", onWheel, { passive: false });
+      return () => {
+        el.removeEventListener("wheel", onWheel);
+        canvasRef.current = null;
+      };
+    },
+    [applyZoom]
+  );
+
+  // 画面を掴んでドラッグでパン。左ボタンは背景のみ、中ボタンはどこからでも
+  const startPan = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === "touch") return; // タッチはネイティブスクロールに任せる
+    const c = canvasRef.current;
+    if (!c) return;
+    // スクロールバー上のクリックはパンにしない
+    const rect = c.getBoundingClientRect();
+    if (
+      e.clientX - rect.left >= c.clientWidth ||
+      e.clientY - rect.top >= c.clientHeight
+    ) {
+      return;
+    }
+    if (e.button === 0) {
+      const t = e.target as HTMLElement;
+      if (t.closest('[data-node], [class*="cursor-pointer"], input, button')) {
+        return;
+      }
+    } else if (e.button !== 1) {
+      return;
+    }
+    panRef.current = {
+      id: e.pointerId,
+      sx: e.clientX,
+      sy: e.clientY,
+      sl: c.scrollLeft,
+      st: c.scrollTop,
     };
-    el.addEventListener("wheel", onWheel, { passive: false });
-    return () => {
-      el.removeEventListener("wheel", onWheel);
-      canvasRef.current = null;
-    };
-  }, []);
+    try {
+      c.setPointerCapture(e.pointerId);
+    } catch {}
+    e.preventDefault();
+    document.documentElement.classList.add("tf-panning");
+  };
+  const movePan = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const p = panRef.current;
+    const c = canvasRef.current;
+    if (!p || !c || e.pointerId !== p.id) return;
+    c.scrollLeft = p.sl - (e.clientX - p.sx);
+    c.scrollTop = p.st - (e.clientY - p.sy);
+  };
+  const endPan = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const p = panRef.current;
+    if (!p || e.pointerId !== p.id) return;
+    panRef.current = null;
+    document.documentElement.classList.remove("tf-panning");
+  };
 
   const forest = useMemo(() => (rows ? buildForest(rows) : []), [rows]);
 
@@ -167,9 +264,15 @@ export function TaskFlowyApp({ db }: { db: DataSource }) {
     refresh();
   };
 
+  /** キャンバス中心を基準にズーム(ボタン/リセット用) */
+  const centerAnchor = () => {
+    const c = canvasRef.current;
+    return c ? { x: c.clientWidth / 2, y: c.clientHeight / 2 } : undefined;
+  };
   const stepZoom = (dz: number) =>
-    setZoom((z) =>
-      Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round((z + dz) * 10) / 10))
+    applyZoom(
+      (z) => Math.round((z + dz) * 10) / 10,
+      centerAnchor()
     );
 
   const goToTree = (id: string) => {
@@ -356,10 +459,14 @@ export function TaskFlowyApp({ db }: { db: DataSource }) {
 
         <div
           ref={attachCanvas}
+          onPointerDown={startPan}
+          onPointerMove={movePan}
+          onPointerUp={endPan}
+          onPointerCancel={endPan}
           className={
             full
-              ? "fixed inset-0 z-50 overflow-auto bg-n100 p-[20px_32px_28px]"
-              : "relative flex-1 overflow-auto bg-n100 p-[20px_32px_28px]"
+              ? "fixed inset-0 z-50 cursor-grab overflow-auto bg-n100 p-[20px_32px_28px]"
+              : "relative flex-1 cursor-grab overflow-auto bg-n100 p-[20px_32px_28px]"
           }
         >
           <div className="sticky top-0 left-0 z-10 mb-2 flex justify-end gap-[10px]">
@@ -389,7 +496,7 @@ export function TaskFlowyApp({ db }: { db: DataSource }) {
                 −
               </span>
               <span
-                onClick={() => setZoom(1)}
+                onClick={() => applyZoom(() => 1, centerAnchor())}
                 className="min-w-[38px] cursor-pointer px-[10px] py-1 text-center text-xs text-n600 tabular-nums select-none hover:bg-accent-100"
               >
                 {Math.round(zoom * 100)}%
@@ -403,7 +510,7 @@ export function TaskFlowyApp({ db }: { db: DataSource }) {
             </div>
           </div>
 
-          <div style={{ zoom }}>
+          <div ref={zoomWrapRef} style={{ zoom }}>
             {rows === null ? (
               <div className="py-16 text-center text-[13px] text-n500">
                 読み込み中…

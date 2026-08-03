@@ -86,7 +86,13 @@ export function NodeCard({
   }
 
   return (
-    <div draggable={!done} onDragStart={handleDragStart} onClick={() => onEdit(n)} style={box}>
+    <div
+      data-node
+      draggable={!done}
+      onDragStart={handleDragStart}
+      onClick={() => onEdit(n)}
+      style={box}
+    >
       <div
         style={{
           fontSize: rec.depth === 0 ? 18 : 17,
