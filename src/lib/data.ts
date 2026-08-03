@@ -27,8 +27,12 @@ export interface DataSource {
     path: string;
     due_date: string | null;
     node_id: string | null;
+    listed_on: string;
   }): Promise<ListItem>;
-  updateListItem(id: string, patch: Partial<Pick<ListItem, "checked">>): Promise<void>;
+  updateListItem(
+    id: string,
+    patch: Partial<Pick<ListItem, "checked" | "list" | "listed_on">>
+  ): Promise<void>;
   deleteListItem(id: string): Promise<void>;
 }
 
@@ -98,6 +102,7 @@ export async function createListItem(input: {
   path: string;
   due_date: string | null;
   node_id: string | null;
+  listed_on: string;
 }): Promise<ListItem> {
   const supabase = createClient();
   const { data, error } = await supabase
@@ -111,7 +116,7 @@ export async function createListItem(input: {
 
 export async function updateListItem(
   id: string,
-  patch: Partial<Pick<ListItem, "checked">>
+  patch: Partial<Pick<ListItem, "checked" | "list" | "listed_on">>
 ): Promise<void> {
   const supabase = createClient();
   const { error } = await supabase.from("list_items").update(patch).eq("id", id);

@@ -23,6 +23,7 @@ import type {
   ListName,
   NodeRow,
   TreeNode,
+  ViewListItem,
 } from "@/lib/types";
 
 const ZOOM_MIN = 0.4;
@@ -36,6 +37,8 @@ const FULL_EXIT_ICON =
 export function TaskFlowyApp({ db }: { db: DataSource }) {
   const [rows, setRows] = useState<NodeRow[] | null>(null);
   const [items, setItems] = useState<ListItem[] | null>(null);
+  // 「今日」はSSRとのズレを避けるためマウント後に確定し、フォーカス復帰時に再計算(日跨ぎ追随)
+  const [today, setToday] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [zoom, setZoom] = useState(1);
   const [full, setFull] = useState(false);
@@ -74,6 +77,18 @@ export function TaskFlowyApp({ db }: { db: DataSource }) {
     } catch {}
   }, [zoom]);
 
+  // 日跨ぎ: フォーカス復帰・タブ表示のたびに「今日」を取り直す
+  useEffect(() => {
+    const upd = () => setToday(todayIso());
+    upd();
+    window.addEventListener("focus", upd);
+    document.addEventListener("visibilitychange", upd);
+    return () => {
+      window.removeEventListener("focus", upd);
+      document.removeEventListener("visibilitychange", upd);
+    };
+  }, []);
+
   // Esc: ダイアログ → 全画面 の順に閉じる
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
@@ -104,6 +119,44 @@ export function TaskFlowyApp({ db }: { db: DataSource }) {
   }, []);
 
   const forest = useMemo(() => (rows ? buildForest(rows) : []), [rows]);
+
+  const doneNodeIds = useMemo(
+    () =>
+      new Set((rows ?? []).filter((r) => r.status === "done").map((r) => r.id)),
+    [rows]
+  );
+
+  // リンク先ノードの完了をチェック状態に織り込む
+  const viewItems = useMemo(
+    () =>
+      (items ?? []).map((x) => ({
+        ...x,
+        effChecked:
+          x.checked || (!!x.node_id && doneNodeIds.has(x.node_id)),
+      })),
+    [items, doneNodeIds]
+  );
+
+  // 遅延クリーンアップ: 昨日以前に「今日やる」へ載せて完了済みのものは、日が変わったら片付ける
+  // (完了の記録はツリー側のノードに残る)。ロード直後と日跨ぎ時に1回だけ走らせる
+  const cleanupDoneRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!items || !rows || !today) return;
+    if (cleanupDoneRef.current === today) return;
+    cleanupDoneRef.current = today;
+    const stale = items.filter(
+      (x) =>
+        x.list === "today" &&
+        x.listed_on < today &&
+        (x.checked || (!!x.node_id && doneNodeIds.has(x.node_id)))
+    );
+    if (!stale.length) return;
+    const staleIds = new Set(stale.map((x) => x.id));
+    setItems((s) => s?.filter((x) => !staleIds.has(x.id)) ?? s);
+    stale.forEach((x) => {
+      if (!x.id.startsWith("temp-")) db.deleteListItem(x.id).catch(() => {});
+    });
+  }, [items, rows, today, doneNodeIds, db]);
 
   const refresh = () => {
     db.fetchNodes().then(setRows).catch(() => {});
@@ -185,37 +238,74 @@ export function TaskFlowyApp({ db }: { db: DataSource }) {
     db.deleteNode(id).catch(() => fail("削除に失敗しました"));
   };
 
+  /** リストカードのゾーン間移動(今日へ移すときは listed_on を今日に更新) */
+  const moveItem = (item: ListItem, list: ListName, t: string) => {
+    const patch =
+      list === "today" ? { list, listed_on: t } : { list };
+    setItems((s) => s?.map((x) => (x.id === item.id ? { ...x, ...patch } : x)) ?? s);
+    if (!item.id.startsWith("temp-")) {
+      db.updateListItem(item.id, patch).catch(() => fail("移動に失敗しました"));
+    }
+  };
+
   const handleDrop = (list: ListName, e: DragEvent) => {
     e.preventDefault();
-    const it = dragRef.current;
+    const p = dragRef.current;
     dragRef.current = null;
-    if (!it || !items) return;
-    // 同一タスク(タイトル+パス)の重複追加は無視
-    if (
-      items.some(
-        (x) => x.list === list && x.title === it.title && x.path === it.path
-      )
-    ) {
+    if (!p || !items) return;
+    const t = today ?? todayIso();
+
+    if (p.kind === "item") {
+      const it = p.item;
+      // 移動先に同一タスク(タイトル+パス)が既にあれば統合(元カードを削除)
+      const dup = items.find(
+        (x) =>
+          x.id !== it.id &&
+          x.list === list &&
+          x.title === it.title &&
+          x.path === it.path
+      );
+      if (dup) {
+        handleRemoveItem(it);
+        return;
+      }
+      // 変化がなければ何もしない(持ち越し→今日やる は listed_on の更新が必要)
+      if (it.list === list && (list !== "today" || it.listed_on === t)) return;
+      moveItem(it, list, t);
+      return;
+    }
+
+    // ツリーからのコピー。同一タスクの重複追加は無視するが、
+    // 持ち越し中の同一タスクを今日やるへ落とした場合は「今日再挑戦」として再コミットする
+    const dup = items.find(
+      (x) => x.list === list && x.title === p.title && x.path === p.path
+    );
+    if (dup) {
+      if (list === "today" && dup.listed_on < t && !dup.checked) {
+        moveItem(dup, "today", t);
+      }
       return;
     }
     const temp: ListItem = {
       id: `temp-${crypto.randomUUID()}`,
       user_id: "",
       list,
-      title: it.title,
-      path: it.path,
-      due_date: it.due_date,
-      node_id: it.node_id,
+      title: p.title,
+      path: p.path,
+      due_date: p.due_date,
+      node_id: p.node_id,
       checked: false,
+      listed_on: t,
       created_at: new Date().toISOString(),
     };
     setItems((s) => [...(s ?? []), temp]);
     db.createListItem({
       list,
-      title: it.title,
-      path: it.path,
-      due_date: it.due_date,
-      node_id: it.node_id,
+      title: p.title,
+      path: p.path,
+      due_date: p.due_date,
+      node_id: p.node_id,
+      listed_on: t,
     })
       .then((row) =>
         setItems((s) => s?.map((x) => (x.id === temp.id ? row : x)) ?? s)
@@ -223,16 +313,31 @@ export function TaskFlowyApp({ db }: { db: DataSource }) {
       .catch(() => fail("追加に失敗しました"));
   };
 
-  const handleToggleItem = (item: ListItem) => {
+  /** チェック丸: リストのチェックとリンク先ノードの完了を同期させる */
+  const handleToggleItem = (item: ViewListItem) => {
+    const next = !item.effChecked;
     setItems(
       (s) =>
-        s?.map((x) => (x.id === item.id ? { ...x, checked: !x.checked } : x)) ??
-        s
+        s?.map((x) => (x.id === item.id ? { ...x, checked: next } : x)) ?? s
     );
     if (!item.id.startsWith("temp-")) {
-      db.updateListItem(item.id, { checked: !item.checked }).catch(() =>
+      db.updateListItem(item.id, { checked: next }).catch(() =>
         fail("更新に失敗しました")
       );
+    }
+    if (item.node_id && rows?.some((r) => r.id === item.node_id)) {
+      const patch = next
+        ? {
+            status: "done" as const,
+            done_date: today ?? todayIso(),
+            next_flag: false,
+          }
+        : { status: "todo" as const, done_date: null };
+      setRows(
+        (s) =>
+          s?.map((r) => (r.id === item.node_id ? { ...r, ...patch } : r)) ?? s
+      );
+      db.updateNode(item.node_id, patch).catch(() => fail("更新に失敗しました"));
     }
   };
 
@@ -328,10 +433,14 @@ export function TaskFlowyApp({ db }: { db: DataSource }) {
         </div>
 
         <DoLists
-          items={items ?? []}
+          items={viewItems}
+          today={today}
           onDrop={handleDrop}
           onRemove={handleRemoveItem}
           onToggle={handleToggleItem}
+          onItemDragStart={(item) => {
+            dragRef.current = { kind: "item", item };
+          }}
         />
       </div>
 

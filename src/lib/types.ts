@@ -25,7 +25,14 @@ export interface ListItem {
   due_date: string | null;
   node_id: string | null;
   checked: boolean;
+  /** リストに載せた端末ローカル日付(YYYY-MM-DD)。今日やるの日跨ぎ判定に使う */
+  listed_on: string;
   created_at: string;
+}
+
+/** 表示用: リンク先ノードの完了状態を織り込んだチェック状態付き */
+export interface ViewListItem extends ListItem {
+  effChecked: boolean;
 }
 
 /** 子を展開済みのツリーノード */
@@ -33,10 +40,13 @@ export interface TreeNode extends NodeRow {
   children: TreeNode[];
 }
 
-/** ツリー→リストへのD&Dで運ぶデータ */
-export interface DragPayload {
-  title: string;
-  path: string;
-  due_date: string | null;
-  node_id: string;
-}
+/** D&Dで運ぶデータ。ツリーのノード(コピー)か、リストカード(ゾーン間移動)のどちらか */
+export type DragPayload =
+  | {
+      kind: "node";
+      title: string;
+      path: string;
+      due_date: string | null;
+      node_id: string;
+    }
+  | { kind: "item"; item: ListItem };

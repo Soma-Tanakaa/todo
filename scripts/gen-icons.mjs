@@ -1,4 +1,5 @@
-// PWA用アイコンを依存ライブラリなしで生成する（濃色地に白のチェックマーク）
+// TaskFlowyのアプリアイコンを依存ライブラリなしで生成する。
+// アクセント青地に白のミニツリー(親ノード1つ→子ノード2つ+ベジェコネクタ)。
 import { writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -57,8 +58,17 @@ function png(size, pixel) {
   ]);
 }
 
-const BG = [0x21, 0x21, 0x25];
+const BG = [0x1d, 0x9b, 0xf0]; // アプリのアクセント青
 const FG = [0xff, 0xff, 0xff];
+
+/** 角丸四角の符号付き距離(内側が負) */
+function roundRectDist(px, py, cx, cy, hx, hy, r) {
+  const qx = Math.abs(px - cx) - (hx - r);
+  const qy = Math.abs(py - cy) - (hy - r);
+  const ox = Math.max(qx, 0);
+  const oy = Math.max(qy, 0);
+  return Math.hypot(ox, oy) + Math.min(Math.max(qx, qy), 0) - r;
+}
 
 function distToSegment(px, py, ax, ay, bx, by) {
   const dx = bx - ax;
@@ -69,20 +79,58 @@ function distToSegment(px, py, ax, ay, bx, by) {
   return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
 }
 
+/** 3次ベジェを折れ線サンプリングして距離を求める */
+function bezierPoints(p0, c1, c2, p1, n = 32) {
+  const pts = [];
+  for (let i = 0; i <= n; i++) {
+    const t = i / n;
+    const u = 1 - t;
+    pts.push([
+      u * u * u * p0[0] + 3 * u * u * t * c1[0] + 3 * u * t * t * c2[0] + t * t * t * p1[0],
+      u * u * u * p0[1] + 3 * u * u * t * c1[1] + 3 * u * t * t * c2[1] + t * t * t * p1[1],
+    ]);
+  }
+  return pts;
+}
+
+function distToPolyline(px, py, pts) {
+  let d = Infinity;
+  for (let i = 0; i < pts.length - 1; i++) {
+    d = Math.min(
+      d,
+      distToSegment(px, py, pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1])
+    );
+  }
+  return d;
+}
+
 function makeIcon(size) {
-  const p0 = [0.28 * size, 0.53 * size];
-  const p1 = [0.445 * size, 0.685 * size];
-  const p2 = [0.74 * size, 0.36 * size];
-  const half = size * 0.055;
+  const s = (v) => v * size;
+  // ノード: 親(左中央) + 子2つ(右上/右下)。アプリのツリーレイアウトの縮図
+  const rects = [
+    [s(0.295), s(0.5), s(0.135), s(0.105), s(0.05)],
+    [s(0.705), s(0.27), s(0.135), s(0.105), s(0.05)],
+    [s(0.705), s(0.73), s(0.135), s(0.105), s(0.05)],
+  ];
+  // コネクタ: 親の右端中央から子の左端中央へ(アプリと同じ横S字カーブ)
+  const conns = [
+    bezierPoints([s(0.43), s(0.5)], [s(0.505), s(0.5)], [s(0.495), s(0.27)], [s(0.57), s(0.27)]),
+    bezierPoints([s(0.43), s(0.5)], [s(0.505), s(0.5)], [s(0.495), s(0.73)], [s(0.57), s(0.73)]),
+  ];
+  const strokeHalf = s(0.027);
   const aa = Math.max(1, size / 256);
   return png(size, (x, y) => {
     const px = x + 0.5;
     const py = y + 0.5;
-    const d = Math.min(
-      distToSegment(px, py, p0[0], p0[1], p1[0], p1[1]),
-      distToSegment(px, py, p1[0], p1[1], p2[0], p2[1])
-    );
-    const cov = Math.max(0, Math.min(1, (half - d) / aa + 0.5));
+    let cov = 0;
+    for (const [cx, cy, hx, hy, r] of rects) {
+      const d = roundRectDist(px, py, cx, cy, hx, hy, r);
+      cov = Math.max(cov, Math.max(0, Math.min(1, -d / aa + 0.5)));
+    }
+    for (const pts of conns) {
+      const d = distToPolyline(px, py, pts);
+      cov = Math.max(cov, Math.max(0, Math.min(1, (strokeHalf - d) / aa + 0.5)));
+    }
     return [
       Math.round(BG[0] + (FG[0] - BG[0]) * cov),
       Math.round(BG[1] + (FG[1] - BG[1]) * cov),

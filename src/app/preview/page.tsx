@@ -6,6 +6,7 @@
 import { useMemo } from "react";
 import { TaskFlowyApp } from "@/components/TaskFlowyApp";
 import type { DataSource } from "@/lib/data";
+import { todayStart, toIso } from "@/lib/date";
 import type { ListItem, NodeRow, NodeStatus } from "@/lib/types";
 
 const Y = new Date().getFullYear();
@@ -61,6 +62,10 @@ function seedNodes(): NodeRow[] {
 }
 
 function seedItems(): ListItem[] {
+  const today = toIso(todayStart());
+  const y = todayStart();
+  y.setDate(y.getDate() - 1);
+  const yesterday = toIso(y);
   return [
     {
       id: "i1",
@@ -71,6 +76,7 @@ function seedItems(): ListItem[] {
       due_date: iso("8/10"),
       node_id: "hon",
       checked: false,
+      listed_on: today,
       created_at: new Date(2026, 0, 1).toISOString(),
     },
     {
@@ -82,6 +88,20 @@ function seedItems(): ListItem[] {
       due_date: iso("8/12"),
       node_id: "tenshutsu",
       checked: false,
+      listed_on: today,
+      created_at: new Date(2026, 0, 1).toISOString(),
+    },
+    // 昨日「今日やる」に載せたが未完了 → 持ち越しセクションに出る
+    {
+      id: "i3",
+      user_id: "preview",
+      list: "today",
+      title: "緩衝材を買う",
+      path: "引っ越し準備 / 荷造り / 食器の梱包",
+      due_date: iso("8/13"),
+      node_id: "kansho",
+      checked: false,
+      listed_on: yesterday,
       created_at: new Date(2026, 0, 1).toISOString(),
     },
   ];

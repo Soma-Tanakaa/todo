@@ -63,6 +63,7 @@ export function NodeCard({
     e.dataTransfer.setData("text/plain", n.title);
     e.dataTransfer.effectAllowed = "copy";
     onDragStart({
+      kind: "node",
       title: n.title,
       path: rec.path,
       due_date: n.due_date,
