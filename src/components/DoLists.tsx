@@ -185,7 +185,7 @@ function ItemCard({
         <button
           type="button"
           onClick={() => onToggle(item)}
-          className={`cursor-pointer rounded-full border bg-white px-3 py-[3px] text-[11.5px] leading-4 whitespace-nowrap ${
+          className={`cursor-pointer rounded-full border bg-white px-2 py-[3px] text-[11.5px] leading-4 whitespace-nowrap ${
             item.effChecked
               ? "border-n400 font-medium text-n600 hover:bg-n200"
               : "border-accent font-bold text-chip-blue hover:bg-accent-100"
