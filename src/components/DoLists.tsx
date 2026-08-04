@@ -5,6 +5,9 @@ import { formatMD, todayIso } from "@/lib/date";
 import type { ListItem, ListName, ViewListItem } from "@/lib/types";
 import { DuePill } from "./pills";
 
+/** リストカードのドラッグをdragover時に判別するためのMIMEタイプ */
+const ITEM_DRAG_TYPE = "application/x-taskflowy-item";
+
 interface DoListsProps {
   items: ViewListItem[];
   /** 端末ローカルの今日(マウント前はnull) */
@@ -105,7 +108,11 @@ function Zone({
     <div
       onDragOver={(e) => {
         e.preventDefault();
-        e.dataTransfer.dropEffect = "copy";
+        // effectAllowedと矛盾するdropEffectを立てるとdropイベントが発火しない。
+        // リストカード(move)とツリーからのコピー(copy)で出し分ける
+        e.dataTransfer.dropEffect = e.dataTransfer.types.includes(ITEM_DRAG_TYPE)
+          ? "move"
+          : "copy";
       }}
       onDrop={(e) => onDrop(list, e)}
     >
@@ -150,6 +157,7 @@ function ItemCard({
       draggable
       onDragStart={(e) => {
         e.dataTransfer.setData("text/plain", item.title);
+        e.dataTransfer.setData(ITEM_DRAG_TYPE, "1");
         e.dataTransfer.effectAllowed = "move";
         onItemDragStart(item);
       }}
@@ -185,11 +193,25 @@ function ItemCard({
           {item.due_date && <DuePill due={item.due_date} />}
         </span>
       </span>
-      <span
-        onClick={() => onRemove(item)}
-        className="cursor-pointer px-[2px] text-[13px] text-n500 hover:text-accent-700"
-      >
-        ×
+      <span className="flex flex-none flex-col items-end justify-between gap-[6px] self-stretch">
+        <span
+          onClick={() => onRemove(item)}
+          title="リストから外す"
+          className="cursor-pointer px-[2px] text-[13px] leading-none text-n500 hover:text-accent-700"
+        >
+          ×
+        </span>
+        <button
+          type="button"
+          onClick={() => onToggle(item)}
+          className={`cursor-pointer rounded-full border bg-white px-2 py-px text-[10.5px] leading-[15px] whitespace-nowrap ${
+            item.effChecked
+              ? "border-n400 font-medium text-n600 hover:bg-n200"
+              : "border-accent font-bold text-accent-700 hover:bg-accent-100"
+          }`}
+        >
+          {item.effChecked ? "戻す" : "完了"}
+        </button>
       </span>
     </div>
   );
