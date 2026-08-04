@@ -161,7 +161,7 @@ function ItemCard({
         e.dataTransfer.effectAllowed = "move";
         onItemDragStart(item);
       }}
-      className="mb-[10px] flex cursor-grab items-center gap-[10px] rounded-2xl border border-n400 bg-white px-3 py-[10px] shadow-card"
+      className="mb-[10px] flex cursor-grab items-center gap-[6px] rounded-2xl border border-n400 bg-white py-[10px] pr-2 pl-3 shadow-card"
     >
       <span className="min-w-0 flex-1">
         <span
@@ -185,21 +185,22 @@ function ItemCard({
         <button
           type="button"
           onClick={() => onToggle(item)}
-          className={`cursor-pointer rounded-full border bg-white px-[9px] py-[3px] text-[10.5px] leading-[15px] whitespace-nowrap ${
+          className={`cursor-pointer rounded-full border bg-white px-3 py-[3px] text-[11.5px] leading-4 whitespace-nowrap ${
             item.effChecked
               ? "border-n400 font-medium text-n600 hover:bg-n200"
-              : "border-accent font-bold text-accent-700 hover:bg-accent-100"
+              : "border-accent font-bold text-chip-blue hover:bg-accent-100"
           }`}
         >
           {item.effChecked ? "戻す" : "完了"}
         </button>
-        <span
+        <button
+          type="button"
           onClick={() => onRemove(item)}
           title="リストから外す"
-          className="cursor-pointer px-[6px] py-[2px] text-[13px] leading-none text-n500 hover:text-accent-700"
+          className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-full text-[17px] leading-none text-n600 hover:bg-n200 hover:text-n900"
         >
           ×
-        </span>
+        </button>
       </span>
     </div>
   );
