@@ -18,7 +18,13 @@ export const metadata: Metadata = {
     title: "TaskFlowy",
     statusBarStyle: "default",
   },
+  // metadata.icons を指定するとファイル規約(src/app/icon.png)のリンクは出力されないため、
+  // favicon含めここで全て明示する
   icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "48x48" },
+      { url: "/icon-192.png", type: "image/png", sizes: "192x192" },
+    ],
     apple: "/apple-touch-icon.png",
   },
 };

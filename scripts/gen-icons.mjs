@@ -104,7 +104,7 @@ function distToPolyline(px, py, pts) {
   return d;
 }
 
-function makeIcon(size) {
+function makePixel(size) {
   const s = (v) => v * size;
   // ノード: 親(左中央) + 子2つ(右上/右下)。アプリのツリーレイアウトの縮図
   const rects = [
@@ -117,9 +117,10 @@ function makeIcon(size) {
     bezierPoints([s(0.43), s(0.5)], [s(0.505), s(0.5)], [s(0.495), s(0.27)], [s(0.57), s(0.27)]),
     bezierPoints([s(0.43), s(0.5)], [s(0.505), s(0.5)], [s(0.495), s(0.73)], [s(0.57), s(0.73)]),
   ];
-  const strokeHalf = s(0.027);
+  // 小サイズでも線が消えないよう下限を設ける
+  const strokeHalf = Math.max(s(0.027), 0.7);
   const aa = Math.max(1, size / 256);
-  return png(size, (x, y) => {
+  return (x, y) => {
     const px = x + 0.5;
     const py = y + 0.5;
     let cov = 0;
@@ -137,7 +138,56 @@ function makeIcon(size) {
       Math.round(BG[2] + (FG[2] - BG[2]) * cov),
       255,
     ];
+  };
+}
+
+function makeIcon(size) {
+  return png(size, makePixel(size));
+}
+
+/** マルチサイズICO(32bit BMPエントリ)。ブラウザの /favicon.ico フォールバック用 */
+function makeIco(sizes) {
+  const images = sizes.map((size) => {
+    const pixel = makePixel(size);
+    const header = Buffer.alloc(40);
+    header.writeUInt32LE(40, 0); // biSize
+    header.writeInt32LE(size, 4); // biWidth
+    header.writeInt32LE(size * 2, 8); // biHeight (XOR + ANDマスク)
+    header.writeUInt16LE(1, 12); // biPlanes
+    header.writeUInt16LE(32, 14); // biBitCount
+    const xor = Buffer.alloc(size * size * 4);
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const [r, g, b, a] = pixel(x, size - 1 - y); // BMPは下から上
+        const o = (y * size + x) * 4;
+        xor[o] = b;
+        xor[o + 1] = g;
+        xor[o + 2] = r;
+        xor[o + 3] = a;
+      }
+    }
+    const andRow = Math.ceil(size / 32) * 4;
+    const and = Buffer.alloc(andRow * size); // 全ピクセル不透明(アルファで制御)
+    return { size, data: Buffer.concat([header, xor, and]) };
   });
+  const dir = Buffer.alloc(6);
+  dir.writeUInt16LE(0, 0);
+  dir.writeUInt16LE(1, 2); // type: icon
+  dir.writeUInt16LE(images.length, 4);
+  const entries = [];
+  let offset = 6 + images.length * 16;
+  for (const img of images) {
+    const e = Buffer.alloc(16);
+    e[0] = img.size >= 256 ? 0 : img.size;
+    e[1] = img.size >= 256 ? 0 : img.size;
+    e.writeUInt16LE(1, 4); // planes
+    e.writeUInt16LE(32, 6); // bitCount
+    e.writeUInt32LE(img.data.length, 8);
+    e.writeUInt32LE(offset, 12);
+    offset += img.data.length;
+    entries.push(e);
+  }
+  return Buffer.concat([dir, ...entries, ...images.map((i) => i.data)]);
 }
 
 const targets = [
@@ -151,3 +201,6 @@ for (const [size, file] of targets) {
   writeFileSync(join(root, file), makeIcon(size));
   console.log("wrote", file, `${size}x${size}`);
 }
+
+writeFileSync(join(root, "public/favicon.ico"), makeIco([16, 32, 48]));
+console.log("wrote public/favicon.ico 16/32/48");
