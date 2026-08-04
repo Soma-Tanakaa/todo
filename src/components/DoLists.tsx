@@ -54,7 +54,7 @@ export function DoLists({
             />
           ))}
           <div className="text-center text-xs leading-[1.7] text-n500">
-            チェックで完了 ・ 下の欄へドラッグで今日/明日以降へ
+            完了ボタンで片付け ・ 下の欄へドラッグで今日/明日以降へ
           </div>
         </div>
       )}
@@ -161,20 +161,8 @@ function ItemCard({
         e.dataTransfer.effectAllowed = "move";
         onItemDragStart(item);
       }}
-      className="mb-[10px] flex cursor-grab items-start gap-[10px] rounded-2xl border border-n400 bg-white px-3 py-[10px] shadow-card"
+      className="mb-[10px] flex cursor-grab items-center gap-[10px] rounded-2xl border border-n400 bg-white px-3 py-[10px] shadow-card"
     >
-      <button
-        type="button"
-        onClick={() => onToggle(item)}
-        aria-label={item.effChecked ? "未完了に戻す" : "完了にする"}
-        className={`mt-[3px] flex h-[15px] w-[15px] flex-none cursor-pointer items-center justify-center rounded-full border-[1.5px] ${
-          item.effChecked
-            ? "border-n800 bg-n800 text-[9px] leading-none text-white"
-            : "border-n400 bg-transparent"
-        }`}
-      >
-        {item.effChecked ? "✓" : ""}
-      </button>
       <span className="min-w-0 flex-1">
         <span
           className={`block truncate text-[15px] leading-[1.25] font-bold ${
@@ -193,18 +181,11 @@ function ItemCard({
           {item.due_date && <DuePill due={item.due_date} />}
         </span>
       </span>
-      <span className="flex flex-none flex-col items-end justify-between gap-[6px] self-stretch">
-        <span
-          onClick={() => onRemove(item)}
-          title="リストから外す"
-          className="cursor-pointer px-[2px] text-[13px] leading-none text-n500 hover:text-accent-700"
-        >
-          ×
-        </span>
+      <span className="flex flex-none items-center gap-[2px]">
         <button
           type="button"
           onClick={() => onToggle(item)}
-          className={`cursor-pointer rounded-full border bg-white px-2 py-px text-[10.5px] leading-[15px] whitespace-nowrap ${
+          className={`cursor-pointer rounded-full border bg-white px-[9px] py-[3px] text-[10.5px] leading-[15px] whitespace-nowrap ${
             item.effChecked
               ? "border-n400 font-medium text-n600 hover:bg-n200"
               : "border-accent font-bold text-accent-700 hover:bg-accent-100"
@@ -212,6 +193,13 @@ function ItemCard({
         >
           {item.effChecked ? "戻す" : "完了"}
         </button>
+        <span
+          onClick={() => onRemove(item)}
+          title="リストから外す"
+          className="cursor-pointer px-[6px] py-[2px] text-[13px] leading-none text-n500 hover:text-accent-700"
+        >
+          ×
+        </span>
       </span>
     </div>
   );
