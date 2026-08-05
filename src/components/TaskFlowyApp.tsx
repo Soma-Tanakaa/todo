@@ -525,33 +525,41 @@ export function TaskFlowyApp({ db }: { db: DataSource }) {
             </div>
           </div>
 
-          <div ref={zoomWrapRef} style={{ zoom }}>
-            {rows === null ? (
-              <div className="py-16 text-center text-[13px] text-n500">
-                読み込み中…
-              </div>
-            ) : forest.length === 0 ? (
-              <div className="py-16 text-center text-[13px] text-n500">
-                まだタスクがありません。左の「＋ 根タスクを追加」から始めましょう。
-              </div>
-            ) : (
-              forest.map((tree) => (
-                <TreeSection
-                  key={tree.id}
-                  tree={tree}
-                  collapsed={collapsed}
-                  onToggle={(id) =>
-                    setCollapsed((c) => ({ ...c, [id]: !c[id] }))
-                  }
-                  onAddChild={openAddChild}
-                  onEdit={openEdit}
-                  onOpenNote={openNote}
-                  onDragStart={(p) => {
-                    dragRef.current = p;
-                  }}
-                />
-              ))
-            )}
+          {/* 右の余白: 最右端のタスクを画面中央あたりまでスクロールできるようにする。
+              box-content + w-max でコンテンツ幅に余白を上乗せし、
+              ズームの影響を受けないようzoomラッパーの外に付ける */}
+          <div
+            className="box-content w-max min-w-full"
+            style={forest.length > 0 ? { paddingRight: "45vw" } : undefined}
+          >
+            <div ref={zoomWrapRef} style={{ zoom }}>
+              {rows === null ? (
+                <div className="py-16 text-center text-[13px] text-n500">
+                  読み込み中…
+                </div>
+              ) : forest.length === 0 ? (
+                <div className="py-16 text-center text-[13px] text-n500">
+                  まだタスクがありません。左の「＋ 根タスクを追加」から始めましょう。
+                </div>
+              ) : (
+                forest.map((tree) => (
+                  <TreeSection
+                    key={tree.id}
+                    tree={tree}
+                    collapsed={collapsed}
+                    onToggle={(id) =>
+                      setCollapsed((c) => ({ ...c, [id]: !c[id] }))
+                    }
+                    onAddChild={openAddChild}
+                    onEdit={openEdit}
+                    onOpenNote={openNote}
+                    onDragStart={(p) => {
+                      dragRef.current = p;
+                    }}
+                  />
+                ))
+              )}
+            </div>
           </div>
           {/* 下部の余白: 最下部のタスクを画面中央あたりまでスクロールできるようにする。
               ズームの影響を受けないようzoomラッパーの外に置く */}
