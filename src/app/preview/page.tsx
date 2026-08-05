@@ -20,7 +20,9 @@ function node(
   id: string,
   parent_id: string | null,
   title: string,
-  opts: Partial<Pick<NodeRow, "due_date" | "status" | "next_flag" | "done_date">> = {}
+  opts: Partial<
+    Pick<NodeRow, "due_date" | "note" | "status" | "next_flag" | "done_date">
+  > = {}
 ): NodeRow {
   seq += 1;
   return {
@@ -29,6 +31,7 @@ function node(
     parent_id,
     title,
     due_date: opts.due_date ?? null,
+    note: opts.note ?? null,
     status: (opts.status ?? "todo") as NodeStatus,
     next_flag: opts.next_flag ?? false,
     done_date: opts.done_date ?? null,
@@ -46,8 +49,16 @@ function seedNodes(): NodeRow[] {
     node("keiyaku", "bukken", "契約", { status: "done", done_date: iso("7/28") }),
     node("nizukuri", "hikkoshi", "荷造り", { due_date: iso("8/20"), status: "active" }),
     node("dambo", "nizukuri", "段ボール調達", { status: "done", done_date: iso("8/1") }),
-    node("hon", "nizukuri", "本の梱包", { due_date: iso("8/10"), status: "active" }),
-    node("shokki", "nizukuri", "食器の梱包", { due_date: iso("8/14"), next_flag: true }),
+    node("hon", "nizukuri", "本の梱包", {
+      due_date: iso("8/10"),
+      status: "active",
+      note: "売る本と持っていく本を先に分ける。\n漫画は買取アプリで査定に出す。",
+    }),
+    node("shokki", "nizukuri", "食器の梱包", {
+      due_date: iso("8/14"),
+      next_flag: true,
+      note: "グラス類は1つずつ緩衝材で包む。割れ物シールを箱の側面に貼ること。皿は立てて詰めると割れにくいらしいので試す。",
+    }),
     node("kansho", "shokki", "緩衝材を買う", { due_date: iso("8/13") }),
     node("tetsuzuki", "hikkoshi", "手続き", { due_date: iso("8/12") }),
     node("denki", "tetsuzuki", "電気・ガス解約", { due_date: iso("8/7"), next_flag: true }),
@@ -57,7 +68,11 @@ function seedNodes(): NodeRow[] {
     node("top", "jisso", "トップページ", { due_date: iso("9/5"), status: "active" }),
     node("form", "jisso", "問い合わせフォーム", { due_date: iso("9/12"), next_flag: true }),
     node("design", "site", "デザイン案", { status: "done", done_date: iso("7/25") }),
-    node("haisha", null, "歯医者の予約", { due_date: iso("8/8"), next_flag: true }),
+    node("haisha", null, "歯医者の予約", {
+      due_date: iso("8/8"),
+      next_flag: true,
+      note: "予約は https://example.com/dental から",
+    }),
   ];
 }
 

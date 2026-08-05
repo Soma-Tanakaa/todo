@@ -8,6 +8,7 @@ export interface NodeRow {
   parent_id: string | null;
   title: string;
   due_date: string | null; // YYYY-MM-DD
+  note: string | null;
   status: NodeStatus;
   next_flag: boolean;
   done_date: string | null; // YYYY-MM-DD

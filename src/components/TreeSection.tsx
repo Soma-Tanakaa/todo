@@ -12,6 +12,7 @@ interface TreeSectionProps {
   onToggle: (id: string) => void;
   onAddChild: (node: TreeNode) => void;
   onEdit: (node: TreeNode) => void;
+  onOpenNote: (node: TreeNode) => void;
   onDragStart: (payload: DragPayload) => void;
 }
 
@@ -21,6 +22,7 @@ export function TreeSection({
   onToggle,
   onAddChild,
   onEdit,
+  onOpenNote,
   onDragStart,
 }: TreeSectionProps) {
   const layout = useMemo(() => layoutTree(tree, collapsed), [tree, collapsed]);
@@ -60,6 +62,7 @@ export function TreeSection({
             onToggle={onToggle}
             onAddChild={onAddChild}
             onEdit={onEdit}
+            onOpenNote={onOpenNote}
             onDragStart={onDragStart}
           />
         ))}

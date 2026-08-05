@@ -8,6 +8,7 @@ export interface DataSource {
     parent_id: string | null;
     title: string;
     due_date: string | null;
+    note: string | null;
     sort_order: number;
   }): Promise<NodeRow>;
   updateNode(
@@ -15,7 +16,13 @@ export interface DataSource {
     patch: Partial<
       Pick<
         NodeRow,
-        "title" | "due_date" | "status" | "next_flag" | "done_date" | "sort_order"
+        | "title"
+        | "due_date"
+        | "note"
+        | "status"
+        | "next_flag"
+        | "done_date"
+        | "sort_order"
       >
     >
   ): Promise<void>;
@@ -51,6 +58,7 @@ export async function createNode(input: {
   parent_id: string | null;
   title: string;
   due_date: string | null;
+  note: string | null;
   sort_order: number;
 }): Promise<NodeRow> {
   const supabase = createClient();
@@ -68,6 +76,7 @@ export async function updateNode(
   patch: Partial<{
     title: string;
     due_date: string | null;
+    note: string | null;
     status: NodeStatus;
     next_flag: boolean;
     done_date: string | null;

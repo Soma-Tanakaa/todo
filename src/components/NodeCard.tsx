@@ -2,7 +2,7 @@
 
 import type { CSSProperties, DragEvent } from "react";
 import { formatMD } from "@/lib/date";
-import { NODE_H, NODE_W, type PlacedNode } from "@/lib/tree";
+import { NODE_H, NODE_W, NOTE_GAP, NOTE_W, type PlacedNode } from "@/lib/tree";
 import type { DragPayload, TreeNode } from "@/lib/types";
 import { DuePill, NextChip, StatusChip } from "./pills";
 
@@ -12,6 +12,7 @@ interface NodeCardProps {
   onToggle: (id: string) => void;
   onAddChild: (node: TreeNode) => void;
   onEdit: (node: TreeNode) => void;
+  onOpenNote: (node: TreeNode) => void;
   onDragStart: (payload: DragPayload) => void;
 }
 
@@ -21,6 +22,7 @@ export function NodeCard({
   onToggle,
   onAddChild,
   onEdit,
+  onOpenNote,
   onDragStart,
 }: NodeCardProps) {
   const n = rec.node;
@@ -86,55 +88,73 @@ export function NodeCard({
   }
 
   return (
-    <div
-      data-node
-      draggable={!done}
-      onDragStart={handleDragStart}
-      onClick={() => onEdit(n)}
-      style={box}
-    >
+    <>
       <div
-        style={{
-          fontSize: rec.depth === 0 ? 18 : 17,
-          lineHeight: 1.25,
-          fontWeight: done ? 500 : 700,
-          color: done ? "var(--color-n500)" : "var(--color-n900)",
-          textDecoration: done ? "line-through" : "none",
-          whiteSpace: "nowrap",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-        }}
+        data-node
+        draggable={!done}
+        onDragStart={handleDragStart}
+        onClick={() => onEdit(n)}
+        style={box}
       >
-        {n.title}
-        {done && <span style={{ color: "var(--color-accent-700)" }}> ✓</span>}
-      </div>
-      <div className="mt-[6px] flex items-center gap-[6px]">
-        {active && <StatusChip />}
-        {n.next_flag && <NextChip />}
-        {meta}
-      </div>
-      {hasKids && (
+        <div
+          style={{
+            fontSize: rec.depth === 0 ? 18 : 17,
+            lineHeight: 1.25,
+            fontWeight: done ? 500 : 700,
+            color: done ? "var(--color-n500)" : "var(--color-n900)",
+            textDecoration: done ? "line-through" : "none",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
+          {n.title}
+          {done && <span style={{ color: "var(--color-accent-700)" }}> ✓</span>}
+        </div>
+        <div className="mt-[6px] flex items-center gap-[6px]">
+          {active && <StatusChip />}
+          {n.next_flag && <NextChip />}
+          {meta}
+        </div>
+        {hasKids && (
+          <div
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggle(n.id);
+            }}
+            className="absolute top-[6px] right-[-13px] h-[26px] w-[26px] cursor-pointer rounded-full bg-n800 text-center text-[14px] leading-[26px] text-white select-none"
+          >
+            {collapsed ? "+" : "−"}
+          </div>
+        )}
         <div
           onClick={(e) => {
             e.stopPropagation();
-            onToggle(n.id);
+            onAddChild(n);
           }}
-          className="absolute top-[6px] right-[-13px] h-[26px] w-[26px] cursor-pointer rounded-full bg-n800 text-center text-[14px] leading-[26px] text-white select-none"
+          title="子タスクを追加"
+          className="absolute right-[-13px] h-[26px] w-[26px] cursor-pointer rounded-full border border-accent bg-white text-center text-[13px] leading-[24px] text-accent-700 select-none hover:bg-accent-100"
+          style={{ top: hasKids ? 36 : 19 }}
         >
-          {collapsed ? "+" : "−"}
+          ＋
+        </div>
+      </div>
+      {rec.noteH > 0 && (
+        <div
+          data-note
+          onClick={() => onOpenNote(n)}
+          title="クリックで拡大・編集"
+          className="absolute cursor-pointer overflow-hidden rounded-r-md border-l-2 border-n300 pl-[10px] text-[11.5px] leading-[16px] break-all whitespace-pre-wrap text-n600 select-none hover:bg-white hover:text-n700"
+          style={{
+            left: rec.x + 12,
+            top: rec.y + NODE_H + NOTE_GAP,
+            width: NOTE_W,
+            height: rec.noteH - NOTE_GAP,
+          }}
+        >
+          {n.note}
         </div>
       )}
-      <div
-        onClick={(e) => {
-          e.stopPropagation();
-          onAddChild(n);
-        }}
-        title="子タスクを追加"
-        className="absolute right-[-13px] h-[26px] w-[26px] cursor-pointer rounded-full border border-accent bg-white text-center text-[13px] leading-[24px] text-accent-700 select-none hover:bg-accent-100"
-        style={{ top: hasKids ? 36 : 19 }}
-      >
-        ＋
-      </div>
-    </div>
+    </>
   );
 }

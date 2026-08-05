@@ -12,6 +12,7 @@ export type DialogState =
 export interface SavePatch {
   title: string;
   due_date: string | null;
+  note: string | null;
   status: NodeStatus;
   next_flag: boolean;
 }
@@ -23,6 +24,7 @@ interface TaskDialogProps {
     parentId: string | null;
     title: string;
     due: string | null;
+    note: string | null;
   }) => void;
   onSave: (id: string, patch: SavePatch) => void;
   onDelete: (id: string) => void;
@@ -49,6 +51,7 @@ export function TaskDialog({
   const [status, setStatus] = useState<NodeStatus>(
     isEdit ? state.node.status : "todo"
   );
+  const [note, setNote] = useState(isEdit ? (state.node.note ?? "") : "");
   const [next, setNext] = useState(isEdit ? state.node.next_flag : false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -72,12 +75,14 @@ export function TaskDialog({
       toast("期限は「8/15」の形式で入力してください");
       return;
     }
+    const noteVal = note.trim() ? note.trim() : null;
     if (state.mode === "add") {
-      onCreate({ parentId: state.parentId, title: t, due: parsed.iso });
+      onCreate({ parentId: state.parentId, title: t, due: parsed.iso, note: noteVal });
     } else {
       onSave(state.node.id, {
         title: t,
         due_date: parsed.iso,
+        note: noteVal,
         status,
         next_flag: next,
       });
@@ -117,6 +122,18 @@ export function TaskDialog({
             value={due}
             onChange={(e) => setDue(e.target.value)}
             placeholder="例：8/15"
+          />
+        </div>
+        <div className="mt-[14px]">
+          <div className="mb-[6px] text-xs tracking-[2px] text-n600">
+            メモ（任意）
+          </div>
+          <textarea
+            className="input resize-y"
+            rows={3}
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="補足や参考リンクなど"
           />
         </div>
         {isEdit && (

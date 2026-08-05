@@ -12,6 +12,7 @@ import {
 } from "react";
 import { DoLists } from "@/components/DoLists";
 import { Header } from "@/components/Header";
+import { NoteDialog, type NoteDialogState } from "@/components/NoteDialog";
 import { RootSidebar } from "@/components/RootSidebar";
 import { TaskDialog, type DialogState, type SavePatch } from "@/components/TaskDialog";
 import { TreeSection } from "@/components/TreeSection";
@@ -47,6 +48,9 @@ export function TaskFlowyApp({ db }: { db: DataSource }) {
   const [dialog, setDialog] = useState<DialogState | null>(null);
   const dialogRef = useRef(dialog);
   dialogRef.current = dialog;
+  const [noteDialog, setNoteDialog] = useState<NoteDialogState | null>(null);
+  const noteDialogRef = useRef(noteDialog);
+  noteDialogRef.current = noteDialog;
   const dragRef = useRef<DragPayload | null>(null);
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const zoomWrapRef = useRef<HTMLDivElement | null>(null);
@@ -109,7 +113,8 @@ export function TaskFlowyApp({ db }: { db: DataSource }) {
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
-      if (dialogRef.current) setDialog(null);
+      if (noteDialogRef.current) setNoteDialog(null);
+      else if (dialogRef.current) setDialog(null);
       else setFull(false);
     };
     window.addEventListener("keydown", h);
@@ -298,15 +303,25 @@ export function TaskFlowyApp({ db }: { db: DataSource }) {
     const { children: _children, ...row } = node;
     setDialog({ mode: "edit", node: row });
   };
+  const openNote = (node: TreeNode) =>
+    setNoteDialog({ nodeId: node.id, title: node.title, note: node.note });
+
+  const handleSaveNote = (id: string, note: string | null) => {
+    setNoteDialog(null);
+    setRows((s) => s?.map((r) => (r.id === id ? { ...r, note } : r)) ?? s);
+    db.updateNode(id, { note }).catch(() => fail("保存に失敗しました"));
+  };
 
   const handleCreate = ({
     parentId,
     title,
     due,
+    note,
   }: {
     parentId: string | null;
     title: string;
     due: string | null;
+    note: string | null;
   }) => {
     setDialog(null);
     const siblings = (rows ?? []).filter((r) => r.parent_id === parentId);
@@ -315,7 +330,7 @@ export function TaskFlowyApp({ db }: { db: DataSource }) {
       : 0;
     // 親が折りたたみ中なら展開する
     if (parentId) setCollapsed((c) => ({ ...c, [parentId]: false }));
-    db.createNode({ parent_id: parentId, title, due_date: due, sort_order: sort })
+    db.createNode({ parent_id: parentId, title, due_date: due, note, sort_order: sort })
       .then((row) => setRows((s) => [...(s ?? []), row]))
       .catch(() => fail("追加に失敗しました"));
   };
@@ -530,6 +545,7 @@ export function TaskFlowyApp({ db }: { db: DataSource }) {
                   }
                   onAddChild={openAddChild}
                   onEdit={openEdit}
+                  onOpenNote={openNote}
                   onDragStart={(p) => {
                     dragRef.current = p;
                   }}
@@ -566,6 +582,14 @@ export function TaskFlowyApp({ db }: { db: DataSource }) {
           onCreate={handleCreate}
           onSave={handleSave}
           onDelete={handleDelete}
+        />
+      )}
+      {noteDialog && (
+        <NoteDialog
+          key={`n-${noteDialog.nodeId}`}
+          state={noteDialog}
+          onClose={() => setNoteDialog(null)}
+          onSave={handleSaveNote}
         />
       )}
     </div>

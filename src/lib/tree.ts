@@ -6,6 +6,28 @@ export const NODE_W = 250;
 export const NODE_H = 70;
 export const ROW = 92; // 葉ごとの行送り
 
+// カード下のメモ表示
+export const NOTE_FONT = 11.5;
+export const NOTE_LINE_H = 16;
+export const NOTE_GAP = 4; // カード下端→メモ上端の隙間
+export const NOTE_W = NODE_W - 24;
+// 縦線2px + 左pad10px を引いたテキスト幅を全角文字数に換算した1行の文字数
+const NOTE_CPL = Math.floor((NOTE_W - 12) / NOTE_FONT);
+
+/** メモブロックの高さ(px)。カードとの隙間NOTE_GAPを含む。メモなしは0 */
+export function noteBlockHeight(note: string | null): number {
+  if (!note) return 0;
+  let lines = 0;
+  for (const seg of note.split("\n")) {
+    // 半角0.6/全角1の換算。半角を少なめに数えるとNOTE_CPLのfloorと合わせて
+    // 行数は過大側に倒れ、描画(break-all)がはみ出すことはない
+    let units = 0;
+    for (const ch of seg) units += ch.charCodeAt(0) < 0x2000 ? 0.6 : 1;
+    lines += Math.max(1, Math.ceil(units / NOTE_CPL));
+  }
+  return NOTE_GAP + lines * NOTE_LINE_H;
+}
+
 /** フラットな行からツリーの森を組み立てる(親なし=根タスク) */
 export function buildForest(rows: NodeRow[]): TreeNode[] {
   const map = new Map<string, TreeNode>();
@@ -30,6 +52,8 @@ export interface PlacedNode {
   y: number;
   /** 祖先のパス。根は「ルート」 */
   path: string;
+  /** カード下のメモブロック高さ(隙間込み)。メモなしは0 */
+  noteH: number;
 }
 
 export interface TreeLayout {
@@ -57,21 +81,26 @@ export function layoutTree(
     maxDepth = Math.max(maxDepth, depth);
     const kids = node.children;
     const open = !collapsed[node.id];
+    const noteH = noteBlockHeight(node.note);
     const rec: PlacedNode = {
       node,
       depth,
       x: 20 + depth * COL,
       y: 0,
       path: parentPath,
+      noteH,
     };
     if (!kids.length || !open) {
       rec.y = cursor;
-      cursor += ROW;
+      cursor += ROW + noteH;
     } else {
       const childPath =
         parentPath === "ルート" ? node.title : `${parentPath} / ${node.title}`;
       const recs = kids.map((k) => walk(k, depth + 1, childPath));
       rec.y = (recs[0].y + recs[recs.length - 1].y) / 2;
+      // 親のyは子の中点で決まるため、長いメモが後続ノードに食い込まないよう
+      // カーソルをメモ下端+通常の行間まで押し下げる
+      cursor = Math.max(cursor, rec.y + NODE_H + noteH + (ROW - NODE_H));
       const sx = rec.x + NODE_W;
       const sy = rec.y + NODE_H / 2;
       for (const c of recs) {
