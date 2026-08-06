@@ -11,12 +11,13 @@ export const NOTE_FONT = 11.5;
 export const NOTE_LINE_H = 16;
 export const NOTE_GAP = 4; // カード下端→メモ上端の隙間
 export const NOTE_W = NODE_W - 24;
+export const NOTE_MAX_LINES = 10; // 折りたたみ時に見せる行数
+export const NOTE_TOGGLE_H = 20; // 「すべて表示/折りたたむ」ボタン行の高さ
 // 縦線2px + 左pad10px を引いたテキスト幅を全角文字数に換算した1行の文字数
 const NOTE_CPL = Math.floor((NOTE_W - 12) / NOTE_FONT);
 
-/** メモブロックの高さ(px)。カードとの隙間NOTE_GAPを含む。メモなしは0 */
-export function noteBlockHeight(note: string | null): number {
-  if (!note) return 0;
+/** メモの表示行数(折り返し込み)の見積もり */
+export function noteLineCount(note: string): number {
   let lines = 0;
   for (const seg of note.split("\n")) {
     // 半角0.6/全角1の換算。半角を少なめに数えるとNOTE_CPLのfloorと合わせて
@@ -25,7 +26,19 @@ export function noteBlockHeight(note: string | null): number {
     for (const ch of seg) units += ch.charCodeAt(0) < 0x2000 ? 0.6 : 1;
     lines += Math.max(1, Math.ceil(units / NOTE_CPL));
   }
-  return NOTE_GAP + lines * NOTE_LINE_H;
+  return lines;
+}
+
+/**
+ * メモブロックの高さ(px)。カードとの隙間NOTE_GAPを含む。メモなしは0。
+ * NOTE_MAX_LINES超は折りたたみ(または展開)+トグルボタン行の高さになる
+ */
+export function noteBlockHeight(note: string | null, expanded = false): number {
+  if (!note) return 0;
+  const lines = noteLineCount(note);
+  if (lines <= NOTE_MAX_LINES) return NOTE_GAP + lines * NOTE_LINE_H;
+  const shown = expanded ? lines : NOTE_MAX_LINES;
+  return NOTE_GAP + shown * NOTE_LINE_H + NOTE_TOGGLE_H;
 }
 
 /** フラットな行からツリーの森を組み立てる(親なし=根タスク) */
@@ -70,7 +83,8 @@ export interface TreeLayout {
  */
 export function layoutTree(
   root: TreeNode,
-  collapsed: Record<string, boolean>
+  collapsed: Record<string, boolean>,
+  expandedNotes: Record<string, boolean> = {}
 ): TreeLayout {
   const placed: PlacedNode[] = [];
   const connectors: string[] = [];
@@ -81,7 +95,7 @@ export function layoutTree(
     maxDepth = Math.max(maxDepth, depth);
     const kids = node.children;
     const open = !collapsed[node.id];
-    const noteH = noteBlockHeight(node.note);
+    const noteH = noteBlockHeight(node.note, !!expandedNotes[node.id]);
     const rec: PlacedNode = {
       node,
       depth,

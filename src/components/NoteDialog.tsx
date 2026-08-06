@@ -31,7 +31,7 @@ export function NoteDialog({ state, onClose, onSave }: NoteDialogProps) {
       <form
         onSubmit={submit}
         onClick={(e) => e.stopPropagation()}
-        className="w-[560px] max-w-[92vw] rounded-xl border border-n400 bg-white p-[26px_28px] shadow-dialog"
+        className="w-[720px] max-w-[94vw] rounded-xl border border-n400 bg-white p-[26px_28px] shadow-dialog"
       >
         <div className="text-[20px] font-bold">メモ</div>
         <div className="mt-1 border-b border-divider pb-[14px] text-xs text-n600">
@@ -39,7 +39,7 @@ export function NoteDialog({ state, onClose, onSave }: NoteDialogProps) {
         </div>
         <textarea
           className="input mt-4 resize-y"
-          style={{ fontSize: 15, lineHeight: 1.7, minHeight: 220 }}
+          style={{ fontSize: 15, lineHeight: 1.7, height: "56vh", minHeight: 320 }}
           autoFocus
           value={note}
           onChange={(e) => setNote(e.target.value)}

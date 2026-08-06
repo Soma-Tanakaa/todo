@@ -9,23 +9,30 @@ import { NodeCard } from "./NodeCard";
 interface TreeSectionProps {
   tree: TreeNode;
   collapsed: Record<string, boolean>;
+  expandedNotes: Record<string, boolean>;
   onToggle: (id: string) => void;
   onAddChild: (node: TreeNode) => void;
   onEdit: (node: TreeNode) => void;
   onOpenNote: (node: TreeNode) => void;
+  onToggleNote: (id: string) => void;
   onDragStart: (payload: DragPayload) => void;
 }
 
 export function TreeSection({
   tree,
   collapsed,
+  expandedNotes,
   onToggle,
   onAddChild,
   onEdit,
   onOpenNote,
+  onToggleNote,
   onDragStart,
 }: TreeSectionProps) {
-  const layout = useMemo(() => layoutTree(tree, collapsed), [tree, collapsed]);
+  const layout = useMemo(
+    () => layoutTree(tree, collapsed, expandedNotes),
+    [tree, collapsed, expandedNotes]
+  );
 
   return (
     <div id={`tree-${tree.id}`} className="mb-6 border-b border-divider pb-6">
@@ -59,10 +66,12 @@ export function TreeSection({
             key={rec.node.id}
             rec={rec}
             collapsed={!!collapsed[rec.node.id]}
+            noteExpanded={!!expandedNotes[rec.node.id]}
             onToggle={onToggle}
             onAddChild={onAddChild}
             onEdit={onEdit}
             onOpenNote={onOpenNote}
+            onToggleNote={onToggleNote}
             onDragStart={onDragStart}
           />
         ))}

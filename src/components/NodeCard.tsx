@@ -2,33 +2,48 @@
 
 import type { CSSProperties, DragEvent } from "react";
 import { formatMD } from "@/lib/date";
-import { NODE_H, NODE_W, NOTE_GAP, NOTE_W, type PlacedNode } from "@/lib/tree";
+import {
+  NODE_H,
+  NODE_W,
+  NOTE_GAP,
+  NOTE_LINE_H,
+  NOTE_MAX_LINES,
+  NOTE_W,
+  noteLineCount,
+  type PlacedNode,
+} from "@/lib/tree";
 import type { DragPayload, TreeNode } from "@/lib/types";
 import { DuePill, NextChip, StatusChip } from "./pills";
 
 interface NodeCardProps {
   rec: PlacedNode;
   collapsed: boolean;
+  noteExpanded: boolean;
   onToggle: (id: string) => void;
   onAddChild: (node: TreeNode) => void;
   onEdit: (node: TreeNode) => void;
   onOpenNote: (node: TreeNode) => void;
+  onToggleNote: (id: string) => void;
   onDragStart: (payload: DragPayload) => void;
 }
 
 export function NodeCard({
   rec,
   collapsed,
+  noteExpanded,
   onToggle,
   onAddChild,
   onEdit,
   onOpenNote,
+  onToggleNote,
   onDragStart,
 }: NodeCardProps) {
   const n = rec.node;
   const done = n.status === "done";
   const active = n.status === "active";
   const hasKids = n.children.length > 0;
+  const noteLines = n.note ? noteLineCount(n.note) : 0;
+  const noteClamped = noteLines > NOTE_MAX_LINES;
 
   const box: CSSProperties = {
     position: "absolute",
@@ -139,12 +154,10 @@ export function NodeCard({
           ＋
         </div>
       </div>
-      {rec.noteH > 0 && (
+      {rec.noteH > 0 && n.note && (
         <div
           data-note
-          onClick={() => onOpenNote(n)}
-          title="クリックで拡大・編集"
-          className="absolute cursor-pointer overflow-hidden rounded-r-md border-l-2 border-n300 pl-[10px] text-[11.5px] leading-[16px] break-all whitespace-pre-wrap text-n600 select-none hover:bg-white hover:text-n700"
+          className="absolute rounded-r-md border-l-2 border-n300 pl-[10px] text-[11.5px] leading-[16px] text-n600 select-none"
           style={{
             left: rec.x + 12,
             top: rec.y + NODE_H + NOTE_GAP,
@@ -152,7 +165,28 @@ export function NodeCard({
             height: rec.noteH - NOTE_GAP,
           }}
         >
-          {n.note}
+          <div
+            onClick={() => onOpenNote(n)}
+            title="クリックで拡大・編集"
+            className="cursor-pointer overflow-hidden break-all whitespace-pre-wrap hover:bg-white hover:text-n700"
+            style={{
+              height:
+                (noteClamped && !noteExpanded ? NOTE_MAX_LINES : noteLines) * NOTE_LINE_H,
+            }}
+          >
+            {n.note}
+          </div>
+          {noteClamped && (
+            <div
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleNote(n.id);
+              }}
+              className="cursor-pointer pt-[4px] text-[11px] leading-[16px] font-bold text-accent-700 hover:text-accent"
+            >
+              {noteExpanded ? "折りたたむ" : "すべて表示"}
+            </div>
+          )}
         </div>
       )}
     </>

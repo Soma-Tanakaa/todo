@@ -43,6 +43,8 @@ export function TaskFlowyApp({ db }: { db: DataSource }) {
   // 「今日」はSSRとのズレを避けるためマウント後に確定し、フォーカス復帰時に再計算(日跨ぎ追随)
   const [today, setToday] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  // 長文メモの「すべて表示」展開状態(セッション内のみ。リロード後は折りたたみに戻す)
+  const [expandedNotes, setExpandedNotes] = useState<Record<string, boolean>>({});
   const [zoom, setZoom] = useState(1);
   const [full, setFull] = useState(false);
   const [dialog, setDialog] = useState<DialogState | null>(null);
@@ -547,8 +549,12 @@ export function TaskFlowyApp({ db }: { db: DataSource }) {
                     key={tree.id}
                     tree={tree}
                     collapsed={collapsed}
+                    expandedNotes={expandedNotes}
                     onToggle={(id) =>
                       setCollapsed((c) => ({ ...c, [id]: !c[id] }))
+                    }
+                    onToggleNote={(id) =>
+                      setExpandedNotes((s) => ({ ...s, [id]: !s[id] }))
                     }
                     onAddChild={openAddChild}
                     onEdit={openEdit}
