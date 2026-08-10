@@ -28,6 +28,8 @@ interface TaskDialogProps {
   }) => void;
   onSave: (id: string, patch: SavePatch) => void;
   onDelete: (id: string) => void;
+  /** addモードのみ: 種別を「ミーティング」に切り替える */
+  onSwitchToMeeting?: () => void;
 }
 
 const STATUS_LABELS: { value: NodeStatus; label: string }[] = [
@@ -42,6 +44,7 @@ export function TaskDialog({
   onCreate,
   onSave,
   onDelete,
+  onSwitchToMeeting,
 }: TaskDialogProps) {
   const isEdit = state.mode === "edit";
   const [title, setTitle] = useState(isEdit ? state.node.title : "");
@@ -103,6 +106,26 @@ export function TaskDialog({
         <div className="mt-1 border-b border-divider pb-[14px] text-xs text-n600">
           {sub}
         </div>
+        {state.mode === "add" && onSwitchToMeeting && (
+          <div className="mt-4">
+            <div className="mb-[6px] text-xs tracking-[2px] text-n600">種別</div>
+            <div className="flex overflow-hidden rounded-lg border border-n400">
+              <button
+                type="button"
+                className="flex-1 cursor-default bg-accent-100 py-2 text-[13px] font-bold text-chip-blue"
+              >
+                タスク
+              </button>
+              <button
+                type="button"
+                onClick={onSwitchToMeeting}
+                className="flex-1 cursor-pointer border-l border-divider bg-white py-2 text-[13px] text-n600 hover:bg-n100"
+              >
+                ミーティング
+              </button>
+            </div>
+          </div>
+        )}
         <div className="mt-4">
           <div className="mb-[6px] text-xs tracking-[2px] text-n600">タスク名</div>
           <input

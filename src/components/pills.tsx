@@ -27,6 +27,15 @@ export function StatusChip() {
   );
 }
 
+/** 「会議」チップ(青塗りピル)。ミーティングカードの目印 */
+export function MeetingChip() {
+  return (
+    <span className="inline-block rounded-full bg-chip-blue px-[7px] py-px text-[10.5px] leading-[15px] font-bold whitespace-nowrap text-white">
+      会議
+    </span>
+  );
+}
+
 /** 「次にやる」チップ(白地アウトラインピル) */
 export function NextChip() {
   return (

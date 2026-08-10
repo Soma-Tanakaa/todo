@@ -1,5 +1,8 @@
 export type NodeStatus = "todo" | "active" | "done";
 export type ListName = "today" | "later";
+export type NodeType = "task" | "meeting";
+/** ヘッダータブで切り替える画面 */
+export type AppView = "flow" | "meetings";
 
 /** nodes テーブルの1行(ツリーのノード) */
 export interface NodeRow {
@@ -7,13 +10,18 @@ export interface NodeRow {
   user_id: string;
   parent_id: string | null;
   title: string;
-  due_date: string | null; // YYYY-MM-DD
+  due_date: string | null; // YYYY-MM-DD。ミーティングでは開催日
   note: string | null;
   status: NodeStatus;
   next_flag: boolean;
   done_date: string | null; // YYYY-MM-DD
   sort_order: number;
   created_at: string;
+  node_type: NodeType;
+  meet_start: string | null; // HH:MM(ミーティングのみ)
+  meet_end: string | null; // HH:MM(ミーティングのみ)
+  attendees: string | null; // 参加者の自由記述(ミーティングのみ)
+  meeting_url: string | null; // Google Meet等のURL(ミーティングのみ)
 }
 
 /** list_items テーブルの1行(今日やる/明日以降やる のコピー) */

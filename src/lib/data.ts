@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
-import type { ListItem, ListName, NodeRow, NodeStatus } from "./types";
+import type { ListItem, ListName, NodeRow, NodeStatus, NodeType } from "./types";
 
 /** アプリが必要とするデータ操作一式。本番はSupabase、/previewはメモリ実装 */
 export interface DataSource {
@@ -10,6 +10,11 @@ export interface DataSource {
     due_date: string | null;
     note: string | null;
     sort_order: number;
+    node_type?: NodeType;
+    meet_start?: string | null;
+    meet_end?: string | null;
+    attendees?: string | null;
+    meeting_url?: string | null;
   }): Promise<NodeRow>;
   updateNode(
     id: string,
@@ -23,6 +28,10 @@ export interface DataSource {
         | "next_flag"
         | "done_date"
         | "sort_order"
+        | "meet_start"
+        | "meet_end"
+        | "attendees"
+        | "meeting_url"
       >
     >
   ): Promise<void>;
@@ -43,6 +52,15 @@ export interface DataSource {
   deleteListItem(id: string): Promise<void>;
 }
 
+/** Postgresのtime型は "14:00:00" で返るため、アプリ内表記の "HH:MM" に揃える */
+function normalizeTimes(r: NodeRow): NodeRow {
+  return {
+    ...r,
+    meet_start: r.meet_start?.slice(0, 5) ?? null,
+    meet_end: r.meet_end?.slice(0, 5) ?? null,
+  };
+}
+
 export async function fetchNodes(): Promise<NodeRow[]> {
   const supabase = createClient();
   const { data, error } = await supabase
@@ -51,7 +69,7 @@ export async function fetchNodes(): Promise<NodeRow[]> {
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: true });
   if (error) throw error;
-  return data as NodeRow[];
+  return (data as NodeRow[]).map(normalizeTimes);
 }
 
 export async function createNode(input: {
@@ -60,6 +78,11 @@ export async function createNode(input: {
   due_date: string | null;
   note: string | null;
   sort_order: number;
+  node_type?: NodeType;
+  meet_start?: string | null;
+  meet_end?: string | null;
+  attendees?: string | null;
+  meeting_url?: string | null;
 }): Promise<NodeRow> {
   const supabase = createClient();
   const { data, error } = await supabase
@@ -68,7 +91,7 @@ export async function createNode(input: {
     .select()
     .single();
   if (error) throw error;
-  return data as NodeRow;
+  return normalizeTimes(data as NodeRow);
 }
 
 export async function updateNode(
@@ -81,6 +104,10 @@ export async function updateNode(
     next_flag: boolean;
     done_date: string | null;
     sort_order: number;
+    meet_start: string | null;
+    meet_end: string | null;
+    attendees: string | null;
+    meeting_url: string | null;
   }>
 ): Promise<void> {
   const supabase = createClient();

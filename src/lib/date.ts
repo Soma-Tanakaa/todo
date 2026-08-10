@@ -39,6 +39,61 @@ export function headerDateLabel(): string {
   return `${d.getMonth() + 1}月${d.getDate()}日（${w}）`;
 }
 
+/** 現在時刻を "HH:MM"(ゼロ埋め)で返す。ミーティングの終了判定用 */
+export function nowHM(): string {
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+/** "8/15（金）" 形式 */
+export function formatMDW(iso: string): string {
+  const d = isoToDate(iso);
+  const w = "日月火水木金土"[d.getDay()];
+  return `${d.getMonth() + 1}/${d.getDate()}（${w}）`;
+}
+
+/**
+ * ダイアログの時刻入力をパース。"14:00" / "1400" / "930" / "9" を受理し、
+ * ゼロ埋めの "HH:MM" に正規化する(以降は文字列比較で大小判定できる)。
+ * 空文字は「時刻なし」
+ */
+export function parseTimeInput(
+  raw: string
+): { ok: true; hm: string | null } | { ok: false } {
+  const t = raw.trim();
+  if (!t) return { ok: true, hm: null };
+  const m = /^(\d{1,2}):?(\d{2})?$/.exec(t);
+  if (!m) return { ok: false };
+  const h = +m[1];
+  const mi = m[2] ? +m[2] : 0;
+  if (h > 23 || mi > 59) return { ok: false };
+  return {
+    ok: true,
+    hm: `${String(h).padStart(2, "0")}:${String(mi).padStart(2, "0")}`,
+  };
+}
+
+/** "14:00–15:00"。開始のみは "14:00–"、両方なしは "" */
+export function formatTimeRange(start: string | null, end: string | null): string {
+  if (!start && !end) return "";
+  return `${start ?? ""}–${end ?? ""}`;
+}
+
+/**
+ * ミーティングが終了したか。日付なしは常に未終了。
+ * 当日は終了時刻を過ぎたら終了(終了時刻未入力なら日跨ぎまで表示し続ける)
+ */
+export function isMeetingEnded(
+  due: string | null,
+  meetEnd: string | null,
+  today: string,
+  now: string
+): boolean {
+  if (!due) return false;
+  if (due !== today) return due < today;
+  return meetEnd !== null && meetEnd < now;
+}
+
 export type DueKind = "overdue" | "soon" | "far";
 
 /** 期限バッジの文言と色区分 */

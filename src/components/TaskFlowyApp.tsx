@@ -12,6 +12,12 @@ import {
 } from "react";
 import { DoLists } from "@/components/DoLists";
 import { Header } from "@/components/Header";
+import {
+  MeetingDialog,
+  type MeetingDialogState,
+  type MeetingSavePatch,
+} from "@/components/MeetingDialog";
+import { MeetingsView } from "@/components/MeetingsView";
 import { NoteDialog, type NoteDialogState } from "@/components/NoteDialog";
 import { RootSidebar } from "@/components/RootSidebar";
 import { TaskDialog, type DialogState, type SavePatch } from "@/components/TaskDialog";
@@ -21,6 +27,7 @@ import { todayIso } from "@/lib/date";
 import { toast } from "@/lib/toast";
 import { buildForest, subtreeIds } from "@/lib/tree";
 import type {
+  AppView,
   DragPayload,
   ListItem,
   ListName,
@@ -47,9 +54,15 @@ export function TaskFlowyApp({ db }: { db: DataSource }) {
   const [expandedNotes, setExpandedNotes] = useState<Record<string, boolean>>({});
   const [zoom, setZoom] = useState(1);
   const [full, setFull] = useState(false);
+  const [view, setView] = useState<AppView>("flow");
   const [dialog, setDialog] = useState<DialogState | null>(null);
   const dialogRef = useRef(dialog);
   dialogRef.current = dialog;
+  const [meetingDialog, setMeetingDialog] = useState<MeetingDialogState | null>(
+    null
+  );
+  const meetingDialogRef = useRef(meetingDialog);
+  meetingDialogRef.current = meetingDialog;
   const [noteDialog, setNoteDialog] = useState<NoteDialogState | null>(null);
   const noteDialogRef = useRef(noteDialog);
   noteDialogRef.current = noteDialog;
@@ -83,6 +96,8 @@ export function TaskFlowyApp({ db }: { db: DataSource }) {
       if (c) setCollapsed(JSON.parse(c));
       const z = Number(localStorage.getItem("tf-zoom"));
       if (z >= ZOOM_MIN && z <= ZOOM_MAX) setZoom(z);
+      const v = localStorage.getItem("tf-view");
+      if (v === "flow" || v === "meetings") setView(v);
     } catch {
       // localStorage不可の環境では既定値のまま
     }
@@ -98,6 +113,11 @@ export function TaskFlowyApp({ db }: { db: DataSource }) {
       localStorage.setItem("tf-zoom", String(zoom));
     } catch {}
   }, [zoom]);
+  useEffect(() => {
+    try {
+      localStorage.setItem("tf-view", view);
+    } catch {}
+  }, [view]);
 
   // 日跨ぎ: フォーカス復帰・タブ表示のたびに「今日」を取り直す
   useEffect(() => {
@@ -116,6 +136,7 @@ export function TaskFlowyApp({ db }: { db: DataSource }) {
     const h = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       if (noteDialogRef.current) setNoteDialog(null);
+      else if (meetingDialogRef.current) setMeetingDialog(null);
       else if (dialogRef.current) setDialog(null);
       else setFull(false);
     };
@@ -222,7 +243,24 @@ export function TaskFlowyApp({ db }: { db: DataSource }) {
     document.documentElement.classList.remove("tf-panning");
   };
 
-  const forest = useMemo(() => (rows ? buildForest(rows) : []), [rows]);
+  // 単独ミーティング(タブから追加・parent_idなし)は根タスクとして扱わない
+  const forest = useMemo(
+    () =>
+      rows
+        ? buildForest(
+            rows.filter(
+              (r) => !(r.node_type === "meeting" && r.parent_id === null)
+            )
+          )
+        : [],
+    [rows]
+  );
+
+  // ミーティング一覧はツリー内・単独の両方を対象にする
+  const meetings = useMemo(
+    () => (rows ?? []).filter((r) => r.node_type === "meeting"),
+    [rows]
+  );
 
   const doneNodeIds = useMemo(
     () =>
@@ -303,7 +341,8 @@ export function TaskFlowyApp({ db }: { db: DataSource }) {
     setDialog({ mode: "add", parentId: null, parentTitle: null });
   const openEdit = (node: TreeNode) => {
     const { children: _children, ...row } = node;
-    setDialog({ mode: "edit", node: row });
+    if (row.node_type === "meeting") setMeetingDialog({ mode: "edit", node: row });
+    else setDialog({ mode: "edit", node: row });
   };
   const openNote = (node: TreeNode) =>
     setNoteDialog({ nodeId: node.id, title: node.title, note: node.note });
@@ -337,6 +376,32 @@ export function TaskFlowyApp({ db }: { db: DataSource }) {
       .catch(() => fail("追加に失敗しました"));
   };
 
+  const handleCreateMeeting = ({
+    parentId,
+    ...patch
+  }: { parentId: string | null } & MeetingSavePatch) => {
+    setMeetingDialog(null);
+    const siblings = (rows ?? []).filter((r) => r.parent_id === parentId);
+    const sort = siblings.length
+      ? Math.max(...siblings.map((s) => s.sort_order)) + 1
+      : 0;
+    if (parentId) setCollapsed((c) => ({ ...c, [parentId]: false }));
+    db.createNode({
+      parent_id: parentId,
+      node_type: "meeting",
+      sort_order: sort,
+      ...patch,
+    })
+      .then((row) => setRows((s) => [...(s ?? []), row]))
+      .catch(() => fail("追加に失敗しました"));
+  };
+
+  const handleSaveMeeting = (id: string, patch: MeetingSavePatch) => {
+    setMeetingDialog(null);
+    setRows((s) => s?.map((r) => (r.id === id ? { ...r, ...patch } : r)) ?? s);
+    db.updateNode(id, patch).catch(() => fail("保存に失敗しました"));
+  };
+
   const handleSave = (id: string, patch: SavePatch) => {
     setDialog(null);
     const prev = rows?.find((r) => r.id === id);
@@ -352,6 +417,7 @@ export function TaskFlowyApp({ db }: { db: DataSource }) {
 
   const handleDelete = (id: string) => {
     setDialog(null);
+    setMeetingDialog(null);
     if (!rows) return;
     const ids = subtreeIds(rows, id);
     setRows((s) => s?.filter((r) => !ids.has(r.id)) ?? s);
@@ -470,8 +536,19 @@ export function TaskFlowyApp({ db }: { db: DataSource }) {
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden">
-      <Header />
+      <Header view={view} onChangeView={setView} />
       <div className="flex min-h-0 flex-1 items-stretch">
+        {view === "meetings" ? (
+          <MeetingsView
+            meetings={meetings}
+            today={today}
+            onAdd={() =>
+              setMeetingDialog({ mode: "add", parentId: null, parentTitle: null })
+            }
+            onEdit={(n) => setMeetingDialog({ mode: "edit", node: n })}
+          />
+        ) : (
+          <>
         <RootSidebar roots={forest} onGo={goToTree} onAddRoot={openAddRoot} />
 
         <div
@@ -582,6 +659,8 @@ export function TaskFlowyApp({ db }: { db: DataSource }) {
             dragRef.current = { kind: "item", item };
           }}
         />
+          </>
+        )}
       </div>
 
       {dialog && (
@@ -596,6 +675,44 @@ export function TaskFlowyApp({ db }: { db: DataSource }) {
           onCreate={handleCreate}
           onSave={handleSave}
           onDelete={handleDelete}
+          onSwitchToMeeting={
+            dialog.mode === "add"
+              ? () => {
+                  setDialog(null);
+                  setMeetingDialog({
+                    mode: "add",
+                    parentId: dialog.parentId,
+                    parentTitle: dialog.parentTitle,
+                  });
+                }
+              : undefined
+          }
+        />
+      )}
+      {meetingDialog && (
+        <MeetingDialog
+          key={
+            meetingDialog.mode === "edit"
+              ? `me-${meetingDialog.node.id}`
+              : `ma-${meetingDialog.parentId ?? "root"}`
+          }
+          state={meetingDialog}
+          onClose={() => setMeetingDialog(null)}
+          onCreate={handleCreateMeeting}
+          onSave={handleSaveMeeting}
+          onDelete={handleDelete}
+          onSwitchToTask={
+            meetingDialog.mode === "add"
+              ? () => {
+                  setMeetingDialog(null);
+                  setDialog({
+                    mode: "add",
+                    parentId: meetingDialog.parentId,
+                    parentTitle: meetingDialog.parentTitle,
+                  });
+                }
+              : undefined
+          }
         />
       )}
       {noteDialog && (

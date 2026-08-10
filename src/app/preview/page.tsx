@@ -14,6 +14,12 @@ const iso = (md: string) => {
   const [m, d] = md.split("/").map(Number);
   return `${Y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 };
+// ミーティングのシードは「常に直近の予定」になるよう相対日付で作る
+const rel = (days: number) => {
+  const d = todayStart();
+  d.setDate(d.getDate() + days);
+  return toIso(d);
+};
 
 let seq = 0;
 function node(
@@ -21,7 +27,19 @@ function node(
   parent_id: string | null,
   title: string,
   opts: Partial<
-    Pick<NodeRow, "due_date" | "note" | "status" | "next_flag" | "done_date">
+    Pick<
+      NodeRow,
+      | "due_date"
+      | "note"
+      | "status"
+      | "next_flag"
+      | "done_date"
+      | "node_type"
+      | "meet_start"
+      | "meet_end"
+      | "attendees"
+      | "meeting_url"
+    >
   > = {}
 ): NodeRow {
   seq += 1;
@@ -37,6 +55,11 @@ function node(
     done_date: opts.done_date ?? null,
     sort_order: seq,
     created_at: new Date(2026, 0, 1, 0, 0, seq).toISOString(),
+    node_type: opts.node_type ?? "task",
+    meet_start: opts.meet_start ?? null,
+    meet_end: opts.meet_end ?? null,
+    attendees: opts.attendees ?? null,
+    meeting_url: opts.meeting_url ?? null,
   };
 }
 
@@ -72,6 +95,39 @@ function seedNodes(): NodeRow[] {
       due_date: iso("8/8"),
       next_flag: true,
       note: "予約は https://example.com/dental から",
+    }),
+    // ミーティング: 単独(タブから追加した想定。マインドフローには出ない)
+    node("mtg-kickoff", null, "新規案件キックオフ", {
+      node_type: "meeting",
+      due_date: rel(1),
+      meet_start: "14:00",
+      meet_end: "15:00",
+      attendees: "田中さん、佐藤さん",
+      meeting_url: "https://meet.google.com/abc-defg-hij",
+    }),
+    // ミーティング: ツリー内(特殊カードとして表示)
+    node("mtg-teirei", "site", "クライアント定例", {
+      node_type: "meeting",
+      due_date: rel(3),
+      meet_start: "10:00",
+      meet_end: "10:30",
+      attendees: "A社 山本さん",
+      meeting_url: "https://meet.google.com/xyz-uvwx-yz1",
+      note: "前回の宿題: トップページのラフを見せる",
+    }),
+    // ミーティング: 昨日終了(一覧からは消え、マップ上でグレー表示)
+    node("mtg-review", "site", "デザインレビュー", {
+      node_type: "meeting",
+      due_date: rel(-1),
+      meet_start: "16:00",
+      meet_end: "17:00",
+      attendees: "デザインチーム",
+      meeting_url: "https://meet.google.com/rev-iewx-yz2",
+    }),
+    // ミーティング: 日付未定
+    node("mtg-1on1", null, "1on1（日程調整中）", {
+      node_type: "meeting",
+      attendees: "上長",
     }),
   ];
 }
@@ -139,6 +195,11 @@ function memoryDb(): DataSource {
         next_flag: false,
         done_date: null,
         created_at: new Date().toISOString(),
+        node_type: "task",
+        meet_start: null,
+        meet_end: null,
+        attendees: null,
+        meeting_url: null,
         ...input,
       };
       nodes = [...nodes, row];

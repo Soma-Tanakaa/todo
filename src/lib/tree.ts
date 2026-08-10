@@ -4,7 +4,13 @@ import type { NodeRow, TreeNode } from "./types";
 export const COL = 306; // 列間隔
 export const NODE_W = 250;
 export const NODE_H = 70;
+export const MEET_NODE_H = 88; // ミーティングカードは3行(タイトル/日時/参加者)ぶん高い
 export const ROW = 92; // 葉ごとの行送り
+
+/** ノード種別ごとのカード高さ */
+export function nodeHeight(n: NodeRow): number {
+  return n.node_type === "meeting" ? MEET_NODE_H : NODE_H;
+}
 
 // カード下のメモ表示
 export const NOTE_FONT = 11.5;
@@ -67,6 +73,8 @@ export interface PlacedNode {
   path: string;
   /** カード下のメモブロック高さ(隙間込み)。メモなしは0 */
   noteH: number;
+  /** カード高さ(ミーティングカードは通常より高い) */
+  h: number;
 }
 
 export interface TreeLayout {
@@ -103,10 +111,12 @@ export function layoutTree(
       y: 0,
       path: parentPath,
       noteH,
+      h: nodeHeight(node),
     };
     if (!kids.length || !open) {
       rec.y = cursor;
-      cursor += ROW + noteH;
+      // 高いカードでもカード間の隙間(ROW - NODE_H)が一定になるよう差分を上乗せ
+      cursor += ROW + (rec.h - NODE_H) + noteH;
     } else {
       const childPath =
         parentPath === "ルート" ? node.title : `${parentPath} / ${node.title}`;
@@ -114,12 +124,12 @@ export function layoutTree(
       rec.y = (recs[0].y + recs[recs.length - 1].y) / 2;
       // 親のyは子の中点で決まるため、長いメモが後続ノードに食い込まないよう
       // カーソルをメモ下端+通常の行間まで押し下げる
-      cursor = Math.max(cursor, rec.y + NODE_H + noteH + (ROW - NODE_H));
+      cursor = Math.max(cursor, rec.y + rec.h + noteH + (ROW - NODE_H));
       const sx = rec.x + NODE_W;
-      const sy = rec.y + NODE_H / 2;
+      const sy = rec.y + rec.h / 2;
       for (const c of recs) {
         const ex = 20 + (depth + 1) * COL;
-        const ey = c.y + NODE_H / 2;
+        const ey = c.y + c.h / 2;
         connectors.push(
           `M${sx},${sy} C${sx + 36},${sy} ${ex - 36},${ey} ${ex},${ey}`
         );
