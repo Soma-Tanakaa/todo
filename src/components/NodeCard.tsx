@@ -157,7 +157,7 @@ export function NodeCard({
       {rec.noteH > 0 && n.note && (
         <div
           data-note
-          className="absolute rounded-r-md border-l-2 border-n300 pl-[10px] text-[11.5px] leading-[16px] text-n600 select-none"
+          className="absolute rounded-r-md border-l-2 border-n300 pl-[10px] text-[11.5px] leading-[16px] text-n900 select-none"
           style={{
             left: rec.x + 12,
             top: rec.y + NODE_H + NOTE_GAP,
@@ -168,7 +168,7 @@ export function NodeCard({
           <div
             onClick={() => onOpenNote(n)}
             title="クリックで拡大・編集"
-            className="cursor-pointer overflow-hidden break-all whitespace-pre-wrap hover:bg-white hover:text-n700"
+            className="cursor-pointer overflow-hidden break-all whitespace-pre-wrap hover:bg-white"
             style={{
               height:
                 (noteClamped && !noteExpanded ? NOTE_MAX_LINES : noteLines) * NOTE_LINE_H,
