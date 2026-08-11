@@ -7,7 +7,7 @@ import { useMemo } from "react";
 import { TaskFlowyApp } from "@/components/TaskFlowyApp";
 import type { DataSource } from "@/lib/data";
 import { todayStart, toIso } from "@/lib/date";
-import type { ListItem, NodeRow, NodeStatus } from "@/lib/types";
+import type { ListItem, NodeRow, NodeStatus, WorkSession } from "@/lib/types";
 
 const Y = new Date().getFullYear();
 const iso = (md: string) => {
@@ -178,9 +178,37 @@ function seedItems(): ListItem[] {
   ];
 }
 
+// 勤務セッションのシード: カレンダー表示確認用に直近数日 + 先月分を相対日付で作る
+function seedWorkSessions(): WorkSession[] {
+  const at = (days: number, h: number, mi = 0) => {
+    const d = todayStart();
+    d.setDate(d.getDate() + days);
+    d.setHours(h, mi);
+    return d.toISOString();
+  };
+  let i = 0;
+  const s = (start: string, end: string): WorkSession => ({
+    id: `ws-${++i}`,
+    user_id: "preview",
+    started_at: start,
+    ended_at: end,
+    created_at: start,
+  });
+  return [
+    s(at(-1, 9), at(-1, 12, 30)),
+    s(at(-1, 13, 30), at(-1, 18, 15)),
+    s(at(-2, 10), at(-2, 16)),
+    s(at(-4, 9, 15), at(-4, 17, 45)),
+    s(at(-5, 13), at(-5, 19, 30)),
+    s(at(-32, 9), at(-32, 17)),
+    s(at(-33, 10), at(-33, 18, 30)),
+  ];
+}
+
 function memoryDb(): DataSource {
   let nodes = seedNodes();
   let items = seedItems();
+  let workSessions = seedWorkSessions();
   let n = 0;
   const uid = () => `mem-${++n}`;
   return {
@@ -241,6 +269,25 @@ function memoryDb(): DataSource {
     },
     async deleteListItem(id) {
       items = items.filter((x) => x.id !== id);
+    },
+    async fetchWorkSessions() {
+      return [...workSessions];
+    },
+    async startWorkSession() {
+      const row: WorkSession = {
+        id: uid(),
+        user_id: "preview",
+        started_at: new Date().toISOString(),
+        ended_at: null,
+        created_at: new Date().toISOString(),
+      };
+      workSessions = [...workSessions, row];
+      return row;
+    },
+    async stopWorkSession(id, endedAt) {
+      workSessions = workSessions.map((x) =>
+        x.id === id ? { ...x, ended_at: endedAt } : x
+      );
     },
   };
 }

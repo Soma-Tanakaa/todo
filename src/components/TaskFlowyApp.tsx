@@ -22,6 +22,7 @@ import { NoteDialog, type NoteDialogState } from "@/components/NoteDialog";
 import { RootSidebar } from "@/components/RootSidebar";
 import { TaskDialog, type DialogState, type SavePatch } from "@/components/TaskDialog";
 import { TreeSection } from "@/components/TreeSection";
+import { WorkTimeView } from "@/components/WorkTimeView";
 import type { DataSource } from "@/lib/data";
 import { isMeetingEnded, nowHM, todayIso } from "@/lib/date";
 import { toast } from "@/lib/toast";
@@ -34,6 +35,7 @@ import type {
   NodeRow,
   TreeNode,
   ViewListItem,
+  WorkSession,
 } from "@/lib/types";
 
 const ZOOM_MIN = 0.4;
@@ -47,6 +49,7 @@ const FULL_EXIT_ICON =
 export function TaskFlowyApp({ db }: { db: DataSource }) {
   const [rows, setRows] = useState<NodeRow[] | null>(null);
   const [items, setItems] = useState<ListItem[] | null>(null);
+  const [workSessions, setWorkSessions] = useState<WorkSession[] | null>(null);
   // 「今日」はSSRとのズレを避けるためマウント後に確定し、フォーカス復帰時に再計算(日跨ぎ追随)
   const [today, setToday] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
@@ -85,10 +88,11 @@ export function TaskFlowyApp({ db }: { db: DataSource }) {
 
   // 初期ロード(データ + 端末ローカルのUI状態)
   useEffect(() => {
-    Promise.all([db.fetchNodes(), db.fetchListItems()])
-      .then(([n, i]) => {
+    Promise.all([db.fetchNodes(), db.fetchListItems(), db.fetchWorkSessions()])
+      .then(([n, i, w]) => {
         setRows(n);
         setItems(i);
+        setWorkSessions(w);
       })
       .catch(() => toast("読み込みに失敗しました"));
     try {
@@ -97,7 +101,7 @@ export function TaskFlowyApp({ db }: { db: DataSource }) {
       const z = Number(localStorage.getItem("tf-zoom"));
       if (z >= ZOOM_MIN && z <= ZOOM_MAX) setZoom(z);
       const v = localStorage.getItem("tf-view");
-      if (v === "flow" || v === "meetings") setView(v);
+      if (v === "flow" || v === "meetings" || v === "worktime") setView(v);
     } catch {
       // localStorage不可の環境では既定値のまま
     }
@@ -303,6 +307,7 @@ export function TaskFlowyApp({ db }: { db: DataSource }) {
   const refresh = () => {
     db.fetchNodes().then(setRows).catch(() => {});
     db.fetchListItems().then(setItems).catch(() => {});
+    db.fetchWorkSessions().then(setWorkSessions).catch(() => {});
   };
   const fail = (msg: string) => {
     toast(msg);
@@ -553,6 +558,20 @@ export function TaskFlowyApp({ db }: { db: DataSource }) {
     }
   };
 
+  // 勤務時間タイマー: 開始はサーバー確定のstarted_atが必要なため楽観更新しない
+  const handleStartWork = () => {
+    db.startWorkSession()
+      .then((row) => setWorkSessions((s) => [...(s ?? []), row]))
+      .catch(() => fail("開始に失敗しました"));
+  };
+  const handleStopWork = (id: string) => {
+    const endedAt = new Date().toISOString();
+    setWorkSessions(
+      (s) => s?.map((x) => (x.id === id ? { ...x, ended_at: endedAt } : x)) ?? s
+    );
+    db.stopWorkSession(id, endedAt).catch(() => fail("停止に失敗しました"));
+  };
+
   return (
     <div className="flex h-dvh flex-col overflow-hidden">
       <Header view={view} onChangeView={setView} />
@@ -565,6 +584,12 @@ export function TaskFlowyApp({ db }: { db: DataSource }) {
               setMeetingDialog({ mode: "add", parentId: null, parentTitle: null })
             }
             onEdit={(n) => setMeetingDialog({ mode: "edit", node: n })}
+          />
+        ) : view === "worktime" ? (
+          <WorkTimeView
+            sessions={workSessions}
+            onStart={handleStartWork}
+            onStop={handleStopWork}
           />
         ) : (
           <>

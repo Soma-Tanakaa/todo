@@ -7,6 +7,7 @@ import type { AppView } from "@/lib/types";
 const TABS: { value: AppView; label: string }[] = [
   { value: "flow", label: "マインドフロー" },
   { value: "meetings", label: "ミーティング" },
+  { value: "worktime", label: "勤務時間" },
 ];
 
 export function Header({

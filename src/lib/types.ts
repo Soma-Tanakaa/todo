@@ -2,7 +2,7 @@ export type NodeStatus = "todo" | "active" | "done";
 export type ListName = "today" | "later";
 export type NodeType = "task" | "meeting";
 /** ヘッダータブで切り替える画面 */
-export type AppView = "flow" | "meetings";
+export type AppView = "flow" | "meetings" | "worktime";
 
 /** nodes テーブルの1行(ツリーのノード) */
 export interface NodeRow {
@@ -42,6 +42,18 @@ export interface ListItem {
 /** 表示用: リンク先ノードの完了状態を織り込んだチェック状態付き */
 export interface ViewListItem extends ListItem {
   effChecked: boolean;
+}
+
+/**
+ * work_sessions テーブルの1行(勤務時間タイマーの開始〜停止の1区間)。
+ * 稼働中は ended_at が null。経過時間は「現在時刻 - started_at」で導出する
+ */
+export interface WorkSession {
+  id: string;
+  user_id: string;
+  started_at: string; // ISO 8601 (timestamptz)
+  ended_at: string | null;
+  created_at: string;
 }
 
 /** 子を展開済みのツリーノード */
