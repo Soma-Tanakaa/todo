@@ -28,6 +28,7 @@ export interface DataSource {
         | "next_flag"
         | "done_date"
         | "sort_order"
+        | "parent_id"
         | "meet_start"
         | "meet_end"
         | "attendees"
@@ -104,6 +105,7 @@ export async function updateNode(
     next_flag: boolean;
     done_date: string | null;
     sort_order: number;
+    parent_id: string | null;
     meet_start: string | null;
     meet_end: string | null;
     attendees: string | null;

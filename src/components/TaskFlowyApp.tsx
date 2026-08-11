@@ -23,7 +23,7 @@ import { RootSidebar } from "@/components/RootSidebar";
 import { TaskDialog, type DialogState, type SavePatch } from "@/components/TaskDialog";
 import { TreeSection } from "@/components/TreeSection";
 import type { DataSource } from "@/lib/data";
-import { todayIso } from "@/lib/date";
+import { isMeetingEnded, nowHM, todayIso } from "@/lib/date";
 import { toast } from "@/lib/toast";
 import { buildForest, subtreeIds } from "@/lib/tree";
 import type {
@@ -402,6 +402,25 @@ export function TaskFlowyApp({ db }: { db: DataSource }) {
     db.updateNode(id, patch).catch(() => fail("保存に失敗しました"));
   };
 
+  /** 一覧タブで作った単独ミーティングをツリーの子カードとして配置する */
+  const handleAttachMeeting = (meetingId: string, parentId: string) => {
+    setMeetingDialog(null);
+    const siblings = (rows ?? []).filter((r) => r.parent_id === parentId);
+    const sort = siblings.length
+      ? Math.max(...siblings.map((s) => s.sort_order)) + 1
+      : 0;
+    setCollapsed((c) => ({ ...c, [parentId]: false }));
+    setRows(
+      (s) =>
+        s?.map((r) =>
+          r.id === meetingId ? { ...r, parent_id: parentId, sort_order: sort } : r
+        ) ?? s
+    );
+    db.updateNode(meetingId, { parent_id: parentId, sort_order: sort }).catch(
+      () => fail("配置に失敗しました")
+    );
+  };
+
   const handleSave = (id: string, patch: SavePatch) => {
     setDialog(null);
     const prev = rows?.find((r) => r.id === id);
@@ -701,6 +720,25 @@ export function TaskFlowyApp({ db }: { db: DataSource }) {
           onCreate={handleCreateMeeting}
           onSave={handleSaveMeeting}
           onDelete={handleDelete}
+          attachable={
+            meetingDialog.mode === "add" && meetingDialog.parentId
+              ? meetings.filter(
+                  (m) =>
+                    m.parent_id === null &&
+                    !isMeetingEnded(
+                      m.due_date,
+                      m.meet_end,
+                      today ?? todayIso(),
+                      nowHM()
+                    )
+                )
+              : undefined
+          }
+          onAttach={
+            meetingDialog.mode === "add" && meetingDialog.parentId
+              ? (id) => handleAttachMeeting(id, meetingDialog.parentId!)
+              : undefined
+          }
           onSwitchToTask={
             meetingDialog.mode === "add"
               ? () => {

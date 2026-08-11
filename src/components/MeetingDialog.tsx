@@ -1,7 +1,13 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { formatMD, parseDueInput, parseTimeInput } from "@/lib/date";
+import {
+  formatMD,
+  formatMDW,
+  formatTimeRange,
+  parseDueInput,
+  parseTimeInput,
+} from "@/lib/date";
 import { toast } from "@/lib/toast";
 import type { NodeRow } from "@/lib/types";
 
@@ -27,6 +33,10 @@ interface MeetingDialogProps {
   onDelete: (id: string) => void;
   /** addモードのみ: 種別を「タスク」に切り替える */
   onSwitchToTask?: () => void;
+  /** ツリーへの追加時のみ: 配置候補(一覧タブで作った未終了の単独ミーティング) */
+  attachable?: NodeRow[];
+  /** 配置候補を選んだとき(親ノードの子として配置する) */
+  onAttach?: (meetingId: string) => void;
 }
 
 export function MeetingDialog({
@@ -36,6 +46,8 @@ export function MeetingDialog({
   onSave,
   onDelete,
   onSwitchToTask,
+  attachable,
+  onAttach,
 }: MeetingDialogProps) {
   const isEdit = state.mode === "edit";
   const [title, setTitle] = useState(isEdit ? state.node.title : "");
@@ -133,6 +145,38 @@ export function MeetingDialog({
             </div>
           </div>
         )}
+        {state.mode === "add" &&
+          onAttach &&
+          attachable &&
+          attachable.length > 0 && (
+            <div className="mt-4">
+              <div className="mb-[6px] text-xs tracking-[2px] text-n600">
+                作成済みのミーティングを配置
+              </div>
+              <div className="flex max-h-[168px] flex-col gap-[6px] overflow-auto">
+                {attachable.map((m) => (
+                  <button
+                    type="button"
+                    key={m.id}
+                    onClick={() => onAttach(m.id)}
+                    className="cursor-pointer rounded-lg border border-n400 bg-white px-3 py-2 text-left hover:bg-accent-100"
+                  >
+                    <div className="truncate text-[13px] font-bold text-n900">
+                      {m.title}
+                    </div>
+                    <div className="truncate text-[11.5px] text-n600 tabular-nums">
+                      {m.due_date ? formatMDW(m.due_date) : "日付未定"}
+                      {formatTimeRange(m.meet_start, m.meet_end) &&
+                        ` ${formatTimeRange(m.meet_start, m.meet_end)}`}
+                      {m.attendees ? ` ・ ${m.attendees}` : ""}
+                    </div>
+                  </button>
+                ))}
+              </div>
+              <div className="mt-4 border-b border-divider" />
+              <div className="mt-3 text-xs text-n600">または新しく作成する</div>
+            </div>
+          )}
         <div className="mt-4">
           <div className="mb-[6px] text-xs tracking-[2px] text-n600">
             ミーティング名
