@@ -273,11 +273,11 @@ function memoryDb(): DataSource {
     async fetchWorkSessions() {
       return [...workSessions];
     },
-    async startWorkSession() {
+    async startWorkSession(startedAt) {
       const row: WorkSession = {
         id: uid(),
         user_id: "preview",
-        started_at: new Date().toISOString(),
+        started_at: startedAt ?? new Date().toISOString(),
         ended_at: null,
         created_at: new Date().toISOString(),
       };
@@ -287,6 +287,11 @@ function memoryDb(): DataSource {
     async stopWorkSession(id, endedAt) {
       workSessions = workSessions.map((x) =>
         x.id === id ? { ...x, ended_at: endedAt } : x
+      );
+    },
+    async updateWorkSessionStart(id, startedAt) {
+      workSessions = workSessions.map((x) =>
+        x.id === id ? { ...x, started_at: startedAt } : x
       );
     },
   };

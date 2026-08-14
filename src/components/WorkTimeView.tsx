@@ -1,13 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { formatMD, toIso, todayIso } from "@/lib/date";
+import { formatMD, nowHM, parseTimeInput, toIso, todayIso } from "@/lib/date";
+import { toast } from "@/lib/toast";
 import type { WorkSession } from "@/lib/types";
 
 interface WorkTimeViewProps {
   sessions: WorkSession[] | null;
-  onStart: () => void;
+  /** startedAt(ISO)を渡すと押し忘れぶんを遡って記録する。省略時は今から */
+  onStart: (startedAt?: string) => void;
   onStop: (id: string) => void;
+  onEditStart: (id: string, startedAt: string) => void;
 }
 
 /**
@@ -15,7 +18,12 @@ interface WorkTimeViewProps {
  * 経過時間は常に「現在時刻 - started_at」で計算するため、
  * スリープやブラウザ終了をまたいでも停止を押すまで実時間で進み続ける
  */
-export function WorkTimeView({ sessions, onStart, onStop }: WorkTimeViewProps) {
+export function WorkTimeView({
+  sessions,
+  onStart,
+  onStop,
+  onEditStart,
+}: WorkTimeViewProps) {
   // 1秒ごとに現在時刻を更新。スリープ復帰直後はintervalが遅れることがあるため
   // focus/visibilitychange でも即座に取り直す
   const [now, setNow] = useState(() => Date.now());
@@ -64,6 +72,25 @@ export function WorkTimeView({ sessions, onStart, onStop }: WorkTimeViewProps) {
 
   const isCurrentMonth = today.startsWith(monthPrefix);
 
+  // 開始時刻の手入力。"start" = 押し忘れぶんを遡って記録、"fix" = 稼働中の開始時刻を修正
+  const [editing, setEditing] = useState<"start" | "fix" | null>(null);
+  const [timeText, setTimeText] = useState("");
+  const openEditor = (mode: "start" | "fix") => {
+    setTimeText(mode === "fix" && running ? hmOf(running.started_at) : nowHM());
+    setEditing(mode);
+  };
+  const submitTime = () => {
+    const p = parseTimeInput(timeText);
+    if (!p.ok || !p.hm) {
+      toast("時刻は 9:15 のように入力してください");
+      return;
+    }
+    const startedAt = hmToRecentIso(p.hm, Date.now());
+    if (editing === "fix" && running) onEditStart(running.id, startedAt);
+    else onStart(startedAt);
+    setEditing(null);
+  };
+
   // カレンダーのマス(日曜始まり。月初の曜日ぶんは null で埋める)
   const cells = useMemo(() => {
     const blanks = new Date(month.y, month.m, 1).getDay();
@@ -89,11 +116,24 @@ export function WorkTimeView({ sessions, onStart, onStop }: WorkTimeViewProps) {
             {formatElapsed(elapsed)}
           </div>
           <div className="mt-4 text-[12.5px] text-n600">
-            {sessions === null
-              ? "読み込み中…"
-              : running
-                ? `開始 ${startLabel(running.started_at, today)} ・ 今日の合計 ${formatHM(todayMs)}`
-                : `今日の合計 ${formatHM(todayMs)}`}
+            {sessions === null ? (
+              "読み込み中…"
+            ) : running ? (
+              <>
+                開始{" "}
+                <button
+                  type="button"
+                  onClick={() => openEditor("fix")}
+                  title="開始時刻を修正"
+                  className="cursor-pointer rounded px-1 underline decoration-n400 underline-offset-2 select-none hover:bg-n100 hover:text-n900"
+                >
+                  {startLabel(running.started_at, today)}
+                </button>{" "}
+                ・ 今日の合計 {formatHM(todayMs)}
+              </>
+            ) : (
+              `今日の合計 ${formatHM(todayMs)}`
+            )}
           </div>
           {running ? (
             <button
@@ -106,13 +146,62 @@ export function WorkTimeView({ sessions, onStart, onStop }: WorkTimeViewProps) {
           ) : (
             <button
               type="button"
-              onClick={onStart}
+              onClick={() => onStart()}
               disabled={sessions === null}
               className="mt-5 cursor-pointer rounded-full bg-accent px-12 py-3 text-[15px] font-bold text-white select-none hover:bg-accent-600 disabled:cursor-default disabled:bg-n400"
             >
               ▶ 開始
             </button>
           )}
+
+          {editing ? (
+            <div className="mt-4">
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <input
+                  autoFocus
+                  value={timeText}
+                  onChange={(e) => setTimeText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") submitTime();
+                    if (e.key === "Escape") setEditing(null);
+                  }}
+                  placeholder="9:15"
+                  className="w-[92px] rounded-lg border border-n400 px-3 py-2 text-center text-[15px] tabular-nums outline-none focus:border-accent"
+                />
+                <button
+                  type="button"
+                  onClick={submitTime}
+                  className="cursor-pointer rounded-full bg-accent px-5 py-2 text-[13px] font-bold text-white select-none hover:bg-accent-600"
+                >
+                  {editing === "fix" ? "この時刻に変更" : "この時刻で開始"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditing(null)}
+                  className="cursor-pointer rounded-full border border-n400 px-4 py-2 text-[13px] text-n600 select-none hover:bg-n100"
+                >
+                  キャンセル
+                </button>
+              </div>
+              <div className="mt-2 text-[11.5px] text-n500">
+                今より後の時刻は前日の開始として記録します
+              </div>
+            </div>
+          ) : (
+            !running &&
+            sessions !== null && (
+              <div className="mt-3">
+                <button
+                  type="button"
+                  onClick={() => openEditor("start")}
+                  className="cursor-pointer text-[12px] text-n600 underline underline-offset-2 select-none hover:text-n900"
+                >
+                  開始時刻を指定して記録(押し忘れたとき)
+                </button>
+              </div>
+            )
+          )}
+
           <div className="mt-3 text-[11.5px] text-n500">
             スリープやPCの電源を切ってもタイマーは進み続けます(停止を押すまで)
           </div>
@@ -255,8 +344,24 @@ function formatCellHM(ms: number): string {
 
 /** 稼働中セッションの開始表示。当日は "14:32"、前日以前は "8/10 23:12" */
 function startLabel(startedAt: string, today: string): string {
+  const iso = toIso(new Date(Date.parse(startedAt)));
+  return iso === today ? hmOf(startedAt) : `${formatMD(iso)} ${hmOf(startedAt)}`;
+}
+
+/** ISOの時刻部分を "HH:MM" で返す */
+function hmOf(startedAt: string): string {
   const d = new Date(Date.parse(startedAt));
-  const hm = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-  const iso = toIso(d);
-  return iso === today ? hm : `${formatMD(iso)} ${hm}`;
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+/**
+ * 手入力の "HH:MM" を「直近のその時刻」のISOに変換する。
+ * 開始時刻は未来を指せないため、今より後の時刻は前日として扱う(日跨ぎ勤務の記録用)
+ */
+function hmToRecentIso(hm: string, nowMs: number): string {
+  const [h, mi] = hm.split(":").map(Number);
+  const n = new Date(nowMs);
+  const d = new Date(n.getFullYear(), n.getMonth(), n.getDate(), h, mi, 0, 0);
+  if (d.getTime() > nowMs) d.setDate(d.getDate() - 1);
+  return d.toISOString();
 }

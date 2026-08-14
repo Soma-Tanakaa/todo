@@ -559,10 +559,19 @@ export function TaskFlowyApp({ db }: { db: DataSource }) {
   };
 
   // 勤務時間タイマー: 開始はサーバー確定のstarted_atが必要なため楽観更新しない
-  const handleStartWork = () => {
-    db.startWorkSession()
+  // (startedAt を渡した場合は押し忘れぶんを遡って記録する)
+  const handleStartWork = (startedAt?: string) => {
+    db.startWorkSession(startedAt)
       .then((row) => setWorkSessions((s) => [...(s ?? []), row]))
       .catch(() => fail("開始に失敗しました"));
+  };
+  const handleEditWorkStart = (id: string, startedAt: string) => {
+    setWorkSessions(
+      (s) => s?.map((x) => (x.id === id ? { ...x, started_at: startedAt } : x)) ?? s
+    );
+    db.updateWorkSessionStart(id, startedAt).catch(() =>
+      fail("開始時刻の変更に失敗しました")
+    );
   };
   const handleStopWork = (id: string) => {
     const endedAt = new Date().toISOString();
@@ -590,6 +599,7 @@ export function TaskFlowyApp({ db }: { db: DataSource }) {
             sessions={workSessions}
             onStart={handleStartWork}
             onStop={handleStopWork}
+            onEditStart={handleEditWorkStart}
           />
         ) : (
           <>
